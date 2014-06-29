@@ -258,10 +258,8 @@ bool MeshImporter::PrepareMeshes()
 	FbxArray<FbxNode*> fbxMeshes;
 	if (!GetFbxMeshes(fbxMeshes))
 		return false;
-	if (fbxMeshes.Size() == 1)
-		cout << "Found 1 mesh in the fbx file" << endl;
-	else
-		cout << "Found " << fbxMeshes.Size() << " meshes in the fbx file" << endl;
+
+	cout << "Found " << fbxMeshes.Size() << " mesh(es) in the fbx file" << endl;
 
 	// Triangulate meshes if they aren't already
 	FbxGeometryConverter converter(manager);

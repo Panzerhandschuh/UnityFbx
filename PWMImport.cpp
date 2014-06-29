@@ -29,7 +29,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	//argv[3] = L"-materials";
 	//argv[4] = L"C:\\Users\\Tyler\\Documents\\Protowave\\Materials\\Model";
 	
-	if (argc < 3)
+	if (argc < 2)
 	{
 		//cout << "pwmimport <fbx file> <pwm file> [materials dir] [/C] [/N] [/M]\n" << 
 		//	"\tfbx file\tFbx file to import\n" <<
@@ -40,53 +40,68 @@ int _tmain(int argc, _TCHAR* argv[])
 		//	"\t/M\t\tDo not import materials (materials dir will be ignored)\n" <<
 		//	"\tEx: pwmimport \"C:\\FbxFiles\\Cube.fbx\" \"C:\\Protowave\\Models\\MyModel.pwm\"" << 
 		//	"\n\t\t\"C:\\Protowave\\Materials\\MyModel\"" << endl;
-		cout << "pwmimport <fbx file> <pwm file> [options]\n" << 
-			"\t-materials <directory>\tDirectory to output materials\n" <<
-			//"\t-combine\t\tCombine meshes (animations will not work)\n" <<
+		cout << "pwmimport <fbx file> [options]\n" << 
+			"\t-outdir <directory>\tChange directory for converted file\n" <<
+			"\t-texdir <directory>\tChange directory for output textures\n" <<
+			"\t-collider\t\tExport as a collision model\n" <<
 			"\t-nonormals\t\tDo not import normals\n" <<
-			"\tEx: pwmimport \"C:\\FbxFiles\\Cube.fbx\" \"C:\\Protowave\\Models\\MyModel.pwm\"" << 
-			"\n\t\t-materials \"C:\\Protowave\\Materials\\MyModel\"" << endl;
+			"\tEx: pwmimport \"C:\\FbxFiles\\MyModel.fbx\" -outdir \"C:\\Protowave\\Models\"" << 
+			"\n\t\t-texdir \"C:\\Protowave\\Materials\\MyModel\"" << endl;
 		EndApp(EXIT_SUCCESS);
 	}
 
+	// Input file
 	path inputFile(argv[1]);
-	path outputFile(argv[2]);
 
 	// Default values
 	bool importNormals = true;
+	bool isCollider = false;
 	//bool importMaterials = true;
 	//bool combineMeshes = false;
-	path outputDir = outputFile.parent_path();
-	path materialsDir = "";
+	path outputDir = inputFile.parent_path();
+	path texturesDir = outputDir.string() + "\\" + inputFile.stem().string();
 
 	// Check optional arguments
 	for (int i = 3; i < argc; i++)
 	{
-		if (_tcscmp(argv[i], L"-materials") == 0)
+		if (_tcscmp(argv[i], L"-outdir") == 0)
 		{
 			i++;
 			if (i < argc)
-				materialsDir = argv[i];
+				outputDir = argv[i];
 			else
 			{
-				cout << "Error: -materials option missing argument" << endl;
+				cout << "Error: -outdir option missing argument" << endl;
 				EndApp(EXIT_FAILURE);
 			}
-			//cout << "materials" << endl;
+		}
+		else if (_tcscmp(argv[i], L"-texdir") == 0)
+		{
+			i++;
+			if (i < argc)
+				texturesDir = argv[i];
+			else
+			{
+				cout << "Error: -texdir option missing argument" << endl;
+				EndApp(EXIT_FAILURE);
+			}
 		}
 		//else if (_tcscmp(argv[i], L"-combine") == 0)
 		//{
 		//	combineMeshes = true;
 		//	//cout << "combine" << endl;
 		//}
+		else if (_tcscmp(argv[i], L"-collider") == 0)
+		{
+			isCollider = true;
+		}
 		else if (_tcscmp(argv[i], L"-nonormals") == 0)
 		{
 			importNormals = false;
-			//cout << "no normals" << endl;
 		}
 		else
 		{
-			cout << "Error: Invalid argument" << endl;
+			cout << "Error: Invalid argument (" << argv[i] << ")" << endl;
 			EndApp(EXIT_FAILURE);
 		}
 	}
@@ -97,9 +112,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	//	cout << "Error: Invalid materials directory" << endl;
 	//	EndApp(EXIT_FAILURE);
 	//}
-
-	if (materialsDir.empty()) // Use default materials directory (current directory\pwm name)
-		materialsDir = outputDir.string() + "\\" + outputFile.stem().string();
 	
 	// Check if directories exist
 	try
@@ -110,12 +122,12 @@ int _tmain(int argc, _TCHAR* argv[])
 			//cout << "Output directory does not exist" << endl;
 		}
 		// Remove trailing slash from material dir
-		string materialsString = materialsDir.string();
+		string materialsString = texturesDir.string();
 		if (materialsString[materialsString.length() - 1] == '\"')
-			materialsDir = materialsString.substr(0, materialsString.length() - 1);
+			texturesDir = materialsString.substr(0, materialsString.length() - 1);
 
-		if (!is_directory(materialsDir))
-			create_directories(materialsDir);
+		if (!is_directory(texturesDir))
+			create_directories(texturesDir);
 		//cout << "Material directory does not exist" << endl;
 	}
 	catch (exception &e)
@@ -124,14 +136,10 @@ int _tmain(int argc, _TCHAR* argv[])
 		EndApp(EXIT_FAILURE);
 	}
 	
-	string fbxExtension = ".fbx";
-	string pwmExtension = ".pwm";
 	if (!exists(inputFile))
 		cout << "Input file does not exist" << endl;
-	else if (!boost::iequals(inputFile.extension().string(), fbxExtension))
+	else if (!boost::iequals(inputFile.extension().string(), ".fbx"))
 		cout << "Error: Input file must be a .fbx file" << endl;
-	else if (!boost::iequals(outputFile.extension().string(), pwmExtension))
-		cout << "Error: Output file must be a .pwm file" << endl;
 	else
 	{
 		//cout << inputFile.extension() << endl;
@@ -145,8 +153,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			EndApp(EXIT_FAILURE);
 		}
-		CreateTextureFiles(materialsDir, meshes);
-		WriteMaterialsToFile(outputFile, materialsDir, meshes);
+		path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwm");
+		CreateTextureFiles(texturesDir, meshes);
+		WriteMaterialsToFile(outputFile, texturesDir, meshes);
 		WriteMeshesToFile(outputFile, meshes, importNormals);
 
 		// Print created files
@@ -160,9 +169,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				vector<Material> materials = meshes[i].materials;
 				if (ImageInfo::IsValidImage(materials[j].baseTexture))
-					cout << materialsDir.string() << "\\" << materials[j].baseTexture.stem().string() << ".dds" << endl;
+					cout << texturesDir.string() << "\\" << materials[j].baseTexture.stem().string() << ".dds" << endl;
 				if (ImageInfo::IsValidImage(materials[j].bumpMap))
-					cout << materialsDir.string() << "\\" << materials[j].bumpMap.stem().string() << ".dds" << endl;
+					cout << texturesDir.string() << "\\" << materials[j].bumpMap.stem().string() << ".dds" << endl;
 			}
 		}
 	}
