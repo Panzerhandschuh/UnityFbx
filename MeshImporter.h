@@ -16,18 +16,15 @@ class MeshImporter
 public:
 	MeshImporter(const path &inputFile);
 	~MeshImporter();
-	//bool Import(vector<Mesh> &meshes);
 	bool Import(Mesh &mesh);
 
 private:
 	path fbxFile;
-	//path materialsDir;
 	FbxScene *scene;
 	FbxManager *manager;
 
 	bool PrepareMeshes();
 	bool GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes);
-	//void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
 	void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
 	void GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices);
 };

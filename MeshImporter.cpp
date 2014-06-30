@@ -35,16 +35,6 @@ MeshImporter::~MeshImporter()
 	manager->Destroy();
 }
 
-//bool MeshImporter::Import(vector<Mesh> &meshes)
-//{
-//	FbxArray<FbxNode*> fbxMeshes;
-//	GetFbxMeshes(fbxMeshes);
-//
-//
-//
-//	return true;
-//}
-
 bool MeshImporter::Import(Mesh &mesh)
 {
 	FbxArray<FbxNode*> fbxMeshes;
@@ -85,37 +75,8 @@ bool MeshImporter::Import(Mesh &mesh)
 		FbxArray<FbxVector2> fbxUvs;
 		FbxStringList uvNames;
 		fbxMesh->GetUVSetNames(uvNames);
-		//cout << "Num Uv Names: " << uvNames.GetCount() << endl;
 		fbxMesh->GetPolygonVertexUVs(uvNames[0], fbxUvs);
 		FbxGeometryElementMaterial *material = fbxMesh->GetElementMaterial(0);
-		//cout << "Num Materials: " << material->GetIndexArray().GetCount() << endl;
-		/*if (!material || material->GetMappingMode() == FbxLayerElement::EMappingMode::eAllSame)
-		{
-		for (int i = 0; i < fbxMesh->GetPolygonCount(); i++)
-		{
-		materialIds.push_back(materialIndices[startMaterialIndex]);
-		//cout << materialIndices[startMaterialIndex] << " ";
-		}
-		//cout << endl << endl;
-		startMaterialIndex++;
-		}
-		else if (material->GetMappingMode() == FbxLayerElement::EMappingMode::eByPolygon)
-		{
-		// Normalize material indices so that they start from zero and don't skip numbers (this fixes meshes with unassigned indices)
-		NormalizeMaterialArray(material->GetIndexArray());
-
-		int highestIndex = 0;
-		for (int i = 0; i < material->GetIndexArray().GetCount(); i++)
-		{
-		int index = materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex];
-		materialIds.push_back(index);
-		//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex] << " ";
-		if (index > highestIndex)
-		highestIndex = index;
-		}
-		//cout << endl << endl;
-		startMaterialIndex = highestIndex + 1;
-		}*/
 
 		// Group identical normals together with their associated vertices
 		// If a vertex contains more than one unique normal vector or uv vector, duplicate it so it can be compatible with Unity engine
@@ -150,9 +111,6 @@ bool MeshImporter::Import(Mesh &mesh)
 		}
 
 		// Mesh position offset info
-		//FbxVector4 pivotOffset = fbxMeshes[meshIndex]->GeometricTranslation.Get();
-		//std::swap(pivotOffset[1], pivotOffset[2]);
-		//pivotOffset[2] *= -1;
 		FbxDouble3 meshPosition = fbxMeshes[meshIndex]->LclTranslation.Get();
 		if (meshIndex == 0)
 			centerPivotPoint = fbxMeshes[meshIndex]->LclTranslation.Get();
@@ -162,8 +120,6 @@ bool MeshImporter::Import(Mesh &mesh)
 		meshOffset[2] = centerPivotPoint[1] - meshPosition[1]; // The offset index is intentional to account for axis conversion
 		meshOffset[1] = centerPivotPoint[2] - meshPosition[2];
 
-		//FbxVector4 pivotRotation = fbxMeshes[meshIndex]->GeometricRotation.Get();
-
 		FbxVector4 rotationOffset = fbxMeshes[meshIndex]->LclRotation.Get();
 		rotationOffset[0] -= 90;
 		std::swap(rotationOffset[1], rotationOffset[2]);
@@ -171,9 +127,7 @@ bool MeshImporter::Import(Mesh &mesh)
 		// Transform matrices
 		FbxAMatrix offsetRotationMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 0, 180), FbxVector4(1, 1, 1));
 		meshOffset *= offsetRotationMatrix;
-		//pivotOffset *= offsetRotationMatrix;
 		FbxAMatrix normalRotationMatrix(FbxVector4(0, 0, 0), rotationOffset, FbxVector4(1, 1, 1));
-		//FbxAMatrix transformMatrix(meshOffset - pivotOffset, rotationOffset, FbxVector4(1, 1, 1));
 		FbxAMatrix transformMatrix(meshOffset, rotationOffset, FbxVector4(1, 1, 1));
 
 		// Construct Unity engine style mesh
@@ -308,12 +262,6 @@ bool MeshImporter::GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes)
 
 	return true;
 }
-
-
-//void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
-//{
-//
-//}
 
 void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
 {
