@@ -9,7 +9,7 @@ MeshImporter::MeshImporter(const path &inputFile)
 	manager = FbxManager::Create();
 	FbxIOSettings *ioSettings = FbxIOSettings::Create(manager, IOSROOT);
 	FbxImporter *importer = FbxImporter::Create(manager, "");
-	
+
 	if (!importer->Initialize(inputFile.string().c_str(), -1, manager->GetIOSettings()))
 	{
 		cout << "Failed to initialize fbx importer" << endl;
@@ -35,17 +35,17 @@ MeshImporter::~MeshImporter()
 	manager->Destroy();
 }
 
-bool MeshImporter::Import(vector<Mesh> &meshes)
-{
-	FbxArray<FbxNode*> fbxMeshes;
-	GetFbxMeshes(fbxMeshes);
+//bool MeshImporter::Import(vector<Mesh> &meshes)
+//{
+//	FbxArray<FbxNode*> fbxMeshes;
+//	GetFbxMeshes(fbxMeshes);
+//
+//
+//
+//	return true;
+//}
 
-
-
-	return true;
-}
-
-bool MeshImporter::ImportCombined(Mesh &mesh)
+bool MeshImporter::Import(Mesh &mesh)
 {
 	FbxArray<FbxNode*> fbxMeshes;
 	if (!GetFbxMeshes(fbxMeshes))
@@ -67,12 +67,12 @@ bool MeshImporter::ImportCombined(Mesh &mesh)
 	int startTriangleIndex = 0;
 	int startMaterialIndex = 0;
 	FbxDouble3 centerPivotPoint;
-	
+
 	// Get textures
 	vector<Material> materials;
 	vector<int> materialIds;
-	GetMaterialsCombined(fbxMeshes, materials, materialIds);
-	
+	GetMaterials(fbxMeshes, materials, materialIds);
+
 	// Loop through triangle indices to find unique vertex normals
 	// If a unique vertex normal exists, duplicate the vertex
 	for (int meshIndex = 0; meshIndex < fbxMeshes.Size(); meshIndex++)
@@ -91,30 +91,30 @@ bool MeshImporter::ImportCombined(Mesh &mesh)
 		//cout << "Num Materials: " << material->GetIndexArray().GetCount() << endl;
 		/*if (!material || material->GetMappingMode() == FbxLayerElement::EMappingMode::eAllSame)
 		{
-			for (int i = 0; i < fbxMesh->GetPolygonCount(); i++)
-			{
-				materialIds.push_back(materialIndices[startMaterialIndex]);
-				//cout << materialIndices[startMaterialIndex] << " ";
-			}
-			//cout << endl << endl;
-			startMaterialIndex++;
+		for (int i = 0; i < fbxMesh->GetPolygonCount(); i++)
+		{
+		materialIds.push_back(materialIndices[startMaterialIndex]);
+		//cout << materialIndices[startMaterialIndex] << " ";
+		}
+		//cout << endl << endl;
+		startMaterialIndex++;
 		}
 		else if (material->GetMappingMode() == FbxLayerElement::EMappingMode::eByPolygon)
 		{
-			// Normalize material indices so that they start from zero and don't skip numbers (this fixes meshes with unassigned indices)
-			NormalizeMaterialArray(material->GetIndexArray());
+		// Normalize material indices so that they start from zero and don't skip numbers (this fixes meshes with unassigned indices)
+		NormalizeMaterialArray(material->GetIndexArray());
 
-			int highestIndex = 0;
-			for (int i = 0; i < material->GetIndexArray().GetCount(); i++)
-			{
-				int index = materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex];
-				materialIds.push_back(index);
-				//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex] << " ";
-				if (index > highestIndex)
-					highestIndex = index;
-			}
-			//cout << endl << endl;
-			startMaterialIndex = highestIndex + 1;
+		int highestIndex = 0;
+		for (int i = 0; i < material->GetIndexArray().GetCount(); i++)
+		{
+		int index = materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex];
+		materialIds.push_back(index);
+		//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex] << " ";
+		if (index > highestIndex)
+		highestIndex = index;
+		}
+		//cout << endl << endl;
+		startMaterialIndex = highestIndex + 1;
 		}*/
 
 		// Group identical normals together with their associated vertices
@@ -130,7 +130,7 @@ bool MeshImporter::ImportCombined(Mesh &mesh)
 			int size = vertexNormalGroups[vertexIndex].size();
 			for (int i = 0; i < size; i++)
 			{
-				if (vertexNormalGroups[vertexIndex][i].normal == fbxNormals[triangleIndex] && 
+				if (vertexNormalGroups[vertexIndex][i].normal == fbxNormals[triangleIndex] &&
 					vertexNormalGroups[vertexIndex][i].uv == fbxUvs[triangleIndex]) // Duplicate normal and uv found
 				{
 					// Add new triangle index to existing group
@@ -235,7 +235,7 @@ bool MeshImporter::ImportCombined(Mesh &mesh)
 	{
 		normals[i].x *= -1;
 	}
-	for (unsigned int i = 0; i < triangles.size(); i +=3) // Flip triangle winding
+	for (unsigned int i = 0; i < triangles.size(); i += 3) // Flip triangle winding
 	{
 		int tempIndex = triangles[i];
 		triangles[i] = triangles[i + 2];
@@ -310,12 +310,12 @@ bool MeshImporter::GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes)
 }
 
 
+//void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
+//{
+//
+//}
+
 void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
-{
-
-}
-
-void MeshImporter::GetMaterialsCombined(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
 {
 	int materialNumber = 0;
 	for (int meshIndex = 0; meshIndex < meshes.Size(); meshIndex++)
@@ -372,7 +372,7 @@ void MeshImporter::GetMaterialsCombined(const FbxArray<FbxNode*> &meshes, vector
 				// Ignore material if it is not in the material index array
 				if (find(currentMaterialIndices.begin(), currentMaterialIndices.end(), materialIndex) == currentMaterialIndices.end())
 					continue;
-				
+
 				// Get material info
 				Material materialProperties;
 				FbxProperty property = material->FindProperty(FbxLayerElement::sTextureChannelNames[0]);
@@ -468,19 +468,19 @@ ostream& operator<<(ostream& os, const Material &mat)
 		os << "Base Texture: " << mat.baseTexture.stem().string() << endl;
 	if (!mat.bumpMap.empty())
 		os << "Bump Map: " << mat.bumpMap.stem().string() << endl;
-	os << "Diffuse: R:" << (int)(mat.diffuse[0] * 255) << " G:" << 
+	os << "Diffuse: R:" << (int)(mat.diffuse[0] * 255) << " G:" <<
 		(int)(mat.diffuse[1] * 255) << " B:" << (int)(mat.diffuse[2] * 255) << endl;
 	if (mat.hasSpecular)
 	{
-		os << "Specular: R:" << (int)(mat.specular[0] * 255) << " G:" << 
-			(int)(mat.specular[1] * 255) << " B:" << (int)(mat.specular[2] * 255) << 
+		os << "Specular: R:" << (int)(mat.specular[0] * 255) << " G:" <<
+			(int)(mat.specular[1] * 255) << " B:" << (int)(mat.specular[2] * 255) <<
 			" Shininess:" << mat.shininess << endl;
 	}
 	if (mat.uvScaling != FbxDouble3(1, 1, 1))
 		os << "Tiling: " << mat.uvScaling[0] << " " << mat.uvScaling[1] << endl;
 	if (mat.uvTranslation != FbxDouble3(0, 0, 0))
 		os << "Offset: " << mat.uvTranslation[0] << " " << mat.uvTranslation[1] << endl;
-    return os;
+	return os;
 }
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix)
@@ -488,11 +488,11 @@ FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix)
 	FbxVector4 result;
 	for (int i = 0; i < 4; i++)
 	{
-        for (int j = 0; j < 4; j++)
+		for (int j = 0; j < 4; j++)
 		{
-            result[i] += matrix[j][i] * vector[j];
-        }
-    }
+			result[i] += matrix[j][i] * vector[j];
+		}
+	}
 	return result;
 }
 
@@ -501,11 +501,11 @@ FbxVector4& operator*=(FbxVector4 &vector, const FbxAMatrix &matrix)
 	FbxVector4 result;
 	for (int i = 0; i < 4; i++)
 	{
-        for (int j = 0; j < 4; j++)
+		for (int j = 0; j < 4; j++)
 		{
-            result[i] += matrix[j][i] * vector[j];
-        }
-    }
+			result[i] += matrix[j][i] * vector[j];
+		}
+	}
 	vector = result;
 	return vector;
 }

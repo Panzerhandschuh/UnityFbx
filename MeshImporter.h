@@ -9,15 +9,15 @@
 
 using namespace std;
 using namespace boost::filesystem;
-using namespace fbxsdk_2014_1;
+using namespace fbxsdk_2015_1;
 
 class MeshImporter
 {
 public:
 	MeshImporter(const path &inputFile);
 	~MeshImporter();
-	bool Import(vector<Mesh> &meshes);
-	bool ImportCombined(Mesh &mesh);
+	//bool Import(vector<Mesh> &meshes);
+	bool Import(Mesh &mesh);
 
 private:
 	path fbxFile;
@@ -27,8 +27,8 @@ private:
 
 	bool PrepareMeshes();
 	bool GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes);
+	//void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
 	void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
-	void GetMaterialsCombined(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
 	void GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices);
 };
 

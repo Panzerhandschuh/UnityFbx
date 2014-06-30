@@ -3,7 +3,7 @@
 
 void Serializer::SerializeMagicNumber(ofstream &file, const char *text)
 {
-	file.write(text, sizeof(text) - 1);
+	file.write(text, sizeof(text)-1);
 }
 
 void Serializer::Serialize(ofstream &file, const char *text)

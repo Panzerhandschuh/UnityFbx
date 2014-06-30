@@ -21,8 +21,8 @@ struct Material
 
 	bool operator==(const Material &mat)
 	{
-		return (baseTexture == mat.baseTexture && bumpMap == mat.bumpMap && 
-			diffuse == mat.diffuse && hasSpecular == mat.hasSpecular && 
+		return (baseTexture == mat.baseTexture && bumpMap == mat.bumpMap &&
+			diffuse == mat.diffuse && hasSpecular == mat.hasSpecular &&
 			specular == mat.specular && shininess == mat.shininess &&
 			uvScaling == mat.uvScaling && uvTranslation == mat.uvTranslation);
 	}

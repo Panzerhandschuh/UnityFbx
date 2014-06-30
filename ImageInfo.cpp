@@ -32,7 +32,7 @@ bool ImageInfo::IsValidImage(const path &imagePath)
 	if (imagePath.empty())
 		return false;
 	string extension = imagePath.extension().string();
-	if (boost::iequals(extension, ".bmp") || boost::iequals(extension, ".dds") || 
+	if (boost::iequals(extension, ".bmp") || boost::iequals(extension, ".dds") ||
 		boost::iequals(extension, ".jpg") || boost::iequals(extension, ".png") ||
 		boost::iequals(extension, ".tga"))
 		return true;
@@ -97,10 +97,10 @@ bool ImageInfo::GetDdsInfo(FILE *file, ImageData &img)
 
 #define readbyte(a,b) do if(((a)=getc((b))) == EOF) return 0; while (0)
 #define readword(a,b) do { int cc_=0,dd_=0; \
-                          if((cc_=getc((b))) == EOF \
-        		  || (dd_=getc((b))) == EOF) return 0; \
-                          (a) = (cc_<<8) + (dd_); \
-                          } while(0)
+	if ((cc_ = getc((b))) == EOF \
+		|| (dd_ = getc((b))) == EOF) return 0; \
+	(a) = (cc_ << 8) + (dd_); \
+	} while (0)
 
 bool ImageInfo::GetJpgInfo(FILE *file, ImageData &img)
 {
@@ -171,61 +171,15 @@ bool ImageInfo::GetJpgInfo(FILE *file, ImageData &img)
 	}
 
 	return false;
-
-	// Get entire file in bytes
-	//fseek(file, 0, SEEK_END);
-	//long dataSize = ftell(file);
-	//fseek(file, 0, SEEK_SET);
-	//std::vector<unsigned char> data(dataSize);
-	//fread(&data[0], dataSize, 1, file);
-
-	//int i = 0; // Keeps track of the position within the file
-	//// Check for valid JPEG image
-	//if(data[i] == 0xFF && data[i + 1] == 0xD8 && data[i + 2] == 0xFF && data[i + 3] == 0xE0)
-	//{
-	//	i += 4;
-	//	// Check for valid JPEG header (null terminated JFIF)
-	//	if(data[i + 2] == 'J' && data[i + 3] == 'F' && data[i + 4] == 'I' && data[i + 5] == 'F' && data[i + 6] == 0x00)
-	//	{
-	//		// Retrieve the block length of the first block since the first block will not contain the size of file
-	//		unsigned short blockLength = data[i] * 256 + data[i + 1];
-	//		while(i < dataSize)
-	//		{
-	//			i += blockLength; // Increase the file index to get to the next block
-	//			if(i >= dataSize)
-	//				return false; // Check to protect against segmentation faults
-	//			if(data[i] != 0xFF)
-	//				return false; // Check that we are truly at the start of another block
-	//			if(data[i + 1] == 0xC0)
-	//			{
-	//				// 0xFFC0 is the "Start of frame" marker which contains the file size
-	//				// The structure of the 0xFFC0 block is quite simple [0xFFC0][ushort length][uchar precision][ushort x][ushort y]
-	//				img.height = data[i + 5] * 256 + data[i + 6];
-	//				img.width = data[i + 7] * 256 + data[i + 8];
-	//				return true;
-	//			}
-	//			else
-	//			{
-	//				i += 2; // Skip the block marker
-	//				blockLength = data[i] * 256 + data[i + 1]; //Go to the next block
-	//			}
-	//		}
-	//		return false; // If this point is reached then no size was found
-	//	}
-	//	else // Not a valid JFIF string
-	//		return false;
-	//}
-	//else // Not a valid SOI header
-	//	return false;
 }
 
 bool ImageInfo::GetPngInfo(FILE *file, ImageData &img)
 {
 	unsigned char header[8];
 	fread(header, 1, 8, file);
-	
+
 	// Verify header
-	if (header[0] != 0x89 || header[1] != 0x50 || header[2] != 0x4E || header[3] != 0x47 || 
+	if (header[0] != 0x89 || header[1] != 0x50 || header[2] != 0x4E || header[3] != 0x47 ||
 		header[4] != 0x0D || header[5] != 0x0A || header[6] != 0x1A || header[7] != 0x0A)
 	{
 		cout << "asdf";
