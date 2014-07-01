@@ -14,8 +14,9 @@ using namespace std;
 using namespace boost::filesystem;
 using namespace fbxsdk_2015_1;
 
-void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes);
+void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes, bool importMaterials = true);
 void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
+void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
 void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes);
 int RoundToNearestPow2(int num);
@@ -61,7 +62,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	path texturesDir = outputDir.string() + "\\" + inputFile.stem().string();
 
 	// Check optional arguments
-	for (int i = 3; i < argc; i++)
+	for (int i = 2; i < argc; i++)
 	{
 		if (_tcscmp(argv[i], L"-outdir") == 0)
 		{
@@ -104,10 +105,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	try
 	{
 		if (!is_directory(outputDir))
-		{
 			create_directories(outputDir);
-			//cout << "Output directory does not exist" << endl;
-		}
+
 		// Remove trailing slash from material dir
 		string materialsString = texturesDir.string();
 		if (materialsString[materialsString.length() - 1] == '\"')
@@ -115,7 +114,6 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		if (!is_directory(texturesDir))
 			create_directories(texturesDir);
-		//cout << "Material directory does not exist" << endl;
 	}
 	catch (exception &e)
 	{
@@ -134,13 +132,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		meshes.push_back(mesh);
 		MeshImporter importer(inputFile);
 
-		if (!isCollider)
-		{
-			if (!importer.Import(meshes[0]))
-			{
-				EndApp(EXIT_FAILURE);
-			}
+		// Import fbx
+		if (!importer.Import(meshes[0], !isCollider))
+			EndApp(EXIT_FAILURE);
 
+		if (!isCollider) // Standard model
+		{
 			// Create files
 			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwm");
 			CreateTextureFiles(texturesDir, meshes);
@@ -148,21 +145,16 @@ int _tmain(int argc, _TCHAR* argv[])
 			WriteMeshesToFile(outputFile, meshes, importNormals);
 
 			// Print created file info to console
-			PrintCreatedFiles(outputFile, texturesDir, meshes);
+			PrintCreatedFiles(outputFile, texturesDir, meshes, true);
 		}
 		else // Collider mesh
 		{
-			if (!importer.Import(meshes[0]))
-			{
-				EndApp(EXIT_FAILURE);
-			}
-
 			// Create files
 			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwc");
-			WriteMeshesToFile(outputFile, meshes, importNormals);
+			WriteCollidersToFile(outputFile, meshes, importNormals);
 
 			// Print created file info to console
-			PrintCreatedFiles(outputFile, texturesDir, meshes);
+			PrintCreatedFiles(outputFile, texturesDir, meshes, false);
 		}
 	}
 
@@ -170,10 +162,14 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 
-void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes)
+void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes, bool importMaterials)
 {
 	cout << "Created Files:" << endl;
 	cout << outputFile.string() << endl;
+
+	if (!importMaterials)
+		return;
+
 	string materialsFile = outputFile.parent_path().string() + "\\" + outputFile.stem().string() + "_materials.txt";
 	cout << materialsFile << endl;
 	for (unsigned int i = 0; i < meshes.size(); i++)
@@ -198,7 +194,6 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 		cout << "Error: Could not open output file. Another process may be using it." << endl;
 		return;
 	}
-	//cout << endl << "Serializing File" << endl;
 
 	// Header
 	Serializer::SerializeMagicNumber(file, "PWM");
@@ -228,9 +223,7 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 		// Normals
 		int numNormals = 0;
 		if (importNormals)
-		{
 			numNormals = mesh.normals.size();
-		}
 		Serializer::Serialize(file, numNormals);
 		for (int j = 0; j < numNormals; j++)
 			Serializer::Serialize(file, mesh.normals[j]);
@@ -255,6 +248,58 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 		cout << "Uv Count: " << numUvs << endl;
 		cout << "Material Id Count: " << numMaterialIds << endl;
 		cout << "Material Count: " << mesh.materials.size() << endl;
+		cout << endl;
+	}
+}
+
+void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals)
+{
+	ofstream file;
+	file.open(outputFile.string(), ios::out | ios::binary | ios::trunc);
+	if (!file)
+	{
+		cout << "Error: Could not open output file. Another process may be using it." << endl;
+		return;
+	}
+
+	// Header
+	Serializer::SerializeMagicNumber(file, "PWC");
+	float versionNumber = 1;
+	Serializer::Serialize(file, versionNumber);
+
+	// Meshes
+	int numMeshes = meshes.size();
+	Serializer::Serialize(file, numMeshes);
+
+	for (int i = 0; i < numMeshes; i++)
+	{
+		Mesh mesh = meshes[i];
+
+		// Vertices
+		int numVertices = mesh.vertices.size();
+		Serializer::Serialize(file, numVertices);
+		for (int j = 0; j < numVertices; j++)
+			Serializer::Serialize(file, mesh.vertices[j]);
+
+		// Triangles
+		int numTriangles = mesh.triangles.size();
+		Serializer::Serialize(file, numTriangles);
+		for (int j = 0; j < numTriangles; j++)
+			Serializer::Serialize(file, mesh.triangles[j]);
+
+		// Normals
+		int numNormals = 0;
+		if (importNormals)
+			numNormals = mesh.normals.size();
+		Serializer::Serialize(file, numNormals);
+		for (int j = 0; j < numNormals; j++)
+			Serializer::Serialize(file, mesh.normals[j]);
+
+		// Print mesh info
+		cout << "Mesh " << i + 1 << ":" << endl;
+		cout << "Vertex Count: " << numVertices << endl;
+		cout << "Triangle Count: " << numTriangles << endl;
+		cout << "Normal Count: " << numNormals << endl;
 		cout << endl;
 	}
 }

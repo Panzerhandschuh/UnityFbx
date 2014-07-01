@@ -16,7 +16,7 @@ class MeshImporter
 public:
 	MeshImporter(const path &inputFile);
 	~MeshImporter();
-	bool Import(Mesh &mesh);
+	bool Import(Mesh &mesh, bool importMaterials = true);
 
 private:
 	path fbxFile;

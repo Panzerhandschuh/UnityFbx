@@ -35,7 +35,7 @@ MeshImporter::~MeshImporter()
 	manager->Destroy();
 }
 
-bool MeshImporter::Import(Mesh &mesh)
+bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 {
 	FbxArray<FbxNode*> fbxMeshes;
 	if (!GetFbxMeshes(fbxMeshes))
@@ -55,13 +55,7 @@ bool MeshImporter::Import(Mesh &mesh)
 	vector<Vector2> uvs;
 	int currentVertexIndex = 0;
 	int startTriangleIndex = 0;
-	int startMaterialIndex = 0;
 	FbxDouble3 centerPivotPoint;
-
-	// Get textures
-	vector<Material> materials;
-	vector<int> materialIds;
-	GetMaterials(fbxMeshes, materials, materialIds);
 
 	// Loop through triangle indices to find unique vertex normals
 	// If a unique vertex normal exists, duplicate the vertex
@@ -199,9 +193,18 @@ bool MeshImporter::Import(Mesh &mesh)
 	mesh.vertices = vertices;
 	mesh.triangles = triangles;
 	mesh.normals = normals;
-	mesh.uvs = uvs;
-	mesh.materialIds = materialIds;
-	mesh.materials = materials;
+
+	// Import uvs, material ids, and material info
+	if (importMaterials)
+	{
+		vector<Material> materials;
+		vector<int> materialIds;
+		GetMaterials(fbxMeshes, materials, materialIds);
+
+		mesh.uvs = uvs;
+		mesh.materialIds = materialIds;
+		mesh.materials = materials;
+	}
 
 	return true;
 }
