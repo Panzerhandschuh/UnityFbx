@@ -319,28 +319,28 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
 		{
 			vector<Material> materials = meshes[i].materials;
-			file << "material" << j << endl;
+			file << "Material" << j << endl;
 			file << "{" << endl;
 			if (!materials[j].baseTexture.empty())
 			{
 				string textureName = materials[j].baseTexture.stem().string();
-				file << "\t" << "basetexture " << pwmdlFileName << "\\" << textureName << endl;
+				file << "\t" << "BaseTexture " << pwmdlFileName << "\\" << textureName << endl;
 			}
 			if (!materials[j].bumpMap.empty())
 			{
 				string textureName = materials[j].bumpMap.stem().string();
-				file << "\t" << "bumpmap " << pwmdlFileName << "\\" << textureName << endl;
+				file << "\t" << "BumpMap " << pwmdlFileName << "\\" << textureName << endl;
 			}
-			file << "\t" << "diffuse " << (int)(materials[j].diffuse[0] * 255) << " " <<
+			file << "\t" << "Diffuse " << (int)(materials[j].diffuse[0] * 255) << " " <<
 				(int)(materials[j].diffuse[1] * 255) << " " << (int)(materials[j].diffuse[2] * 255) << endl;
 			if (materials[j].hasSpecular)
-				file << "\t" << "specular " << (int)(materials[j].specular[0] * 255) << " " <<
+				file << "\t" << "Specular " << (int)(materials[j].specular[0] * 255) << " " <<
 				(int)(materials[j].specular[1] * 255) << " " << (int)(materials[j].specular[2] * 255) << " " <<
 				materials[j].shininess << endl;
 			if (materials[j].uvScaling != FbxDouble3(1, 1, 1))
-				file << "\t" << "tiling " << materials[j].uvScaling[0] << " " << materials[j].uvScaling[1] << endl;
+				file << "\t" << "Tiling " << materials[j].uvScaling[0] << " " << materials[j].uvScaling[1] << endl;
 			if (materials[j].uvTranslation != FbxDouble3(0, 0, 0))
-				file << "\t" << "offset " << materials[j].uvTranslation[0] << " " << materials[j].uvTranslation[1] << endl;
+				file << "\t" << "Offset " << materials[j].uvTranslation[0] << " " << materials[j].uvTranslation[1] << endl;
 			file << "}";
 			if (j != materials.size() - 1)
 				file << endl << endl;
