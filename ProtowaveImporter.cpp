@@ -19,18 +19,18 @@ const char *PWCOL_NAME = "PWCOL";
 const int PWMDL_VERSION = 1;
 const int PWCOL_VERSION = 1;
 
-void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes, bool importMaterials = true);
+void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFiles, bool importMaterials = true);
 void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
-void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes);
+void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
 int RoundToNearestPow2(int num);
 void EndApp(int success);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	//argc = 5;
-	//argv[1] = L"C:\\Users\\Tyler\\Desktop\\Mat3.fbx";
+	//argc = 2;
+	//argv[1] = L"D:\\Users\\Tyler\\Documents\\Protowave\\Importer\\StandardToPipe.FBX";
 	//argv[2] = L"C:\\Users\\Tyler\\Documents\\Protowave\\Models\\Model.pwm";
 	//argv[3] = L"-materials";
 	//argv[4] = L"C:\\Users\\Tyler\\Documents\\Protowave\\Materials\\Model";
@@ -144,13 +144,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (!isCollider) // Standard model
 		{
 			// Create files
+			vector<string> createdFiles;
+			CreateTextureFiles(texturesDir, meshes, createdFiles);
 			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwmdl");
-			CreateTextureFiles(texturesDir, meshes);
 			WriteMaterialsToFile(outputFile, texturesDir, meshes);
 			WriteMeshesToFile(outputFile, meshes, importNormals);
 
 			// Print created file info to console
-			PrintCreatedFiles(outputFile, texturesDir, meshes, true);
+			PrintCreatedFiles(outputFile, createdFiles, true);
 		}
 		else // Collider mesh
 		{
@@ -159,7 +160,7 @@ int _tmain(int argc, _TCHAR* argv[])
 			WriteCollidersToFile(outputFile, meshes, importNormals);
 
 			// Print created file info to console
-			PrintCreatedFiles(outputFile, texturesDir, meshes, false);
+			PrintCreatedFiles(outputFile, vector<string>(0), false);
 		}
 	}
 
@@ -167,26 +168,17 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 
-void PrintCreatedFiles(const path &outputFile, const path &texturesDir, vector<Mesh> &meshes, bool importMaterials)
+void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFiles, bool importMaterials)
 {
 	cout << "Created Files:" << endl;
 	cout << outputFile.string() << endl;
 
-	if (!importMaterials)
-		return;
-
-	string pwmatFile = outputFile.parent_path().string() + "\\" + outputFile.stem().string() + ".pwmat";
-	cout << pwmatFile << endl;
-	for (unsigned int i = 0; i < meshes.size(); i++)
+	if (importMaterials)
 	{
-		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
-		{
-			vector<Material> materials = meshes[i].materials;
-			if (ImageInfo::IsValidImage(materials[j].baseTexture))
-				cout << texturesDir.string() << "\\" << materials[j].baseTexture.stem().string() << ".dds" << endl;
-			if (ImageInfo::IsValidImage(materials[j].bumpMap))
-				cout << texturesDir.string() << "\\" << materials[j].bumpMap.stem().string() << ".dds" << endl;
-		}
+		string pwmatFile = outputFile.parent_path().string() + "\\" + outputFile.stem().string() + ".pwmat";
+		cout << pwmatFile << endl;
+		for (unsigned int i = 0; i < createdFiles.size(); i++)
+			cout << createdFiles[i] << endl;
 	}
 }
 
@@ -247,7 +239,7 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 		// Print mesh info
 		cout << "Mesh " << i + 1 << ":" << endl;
 		cout << "Vertex Count: " << numVertices << endl;
-		cout << "Triangle Count: " << numTriangles << endl;
+		cout << "Triangle Index Count: " << numTriangles << endl;
 		cout << "Normal Count: " << numNormals << endl;
 		cout << "Uv Count: " << numUvs << endl;
 		cout << "Material Id Count: " << numMaterialIds << endl;
@@ -301,7 +293,7 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 		// Print mesh info
 		cout << "Mesh " << i + 1 << ":" << endl;
 		cout << "Vertex Count: " << numVertices << endl;
-		cout << "Triangle Count: " << numTriangles << endl;
+		cout << "Triangle Index Count: " << numTriangles << endl;
 		cout << "Normal Count: " << numNormals << endl;
 		cout << endl;
 	}
@@ -349,7 +341,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 	file.close();
 }
 
-void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes)
+void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
 {
 	string texconvPath = initial_path().string() + "\\texconv.exe";
 	if (!exists(texconvPath))
@@ -404,15 +396,20 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes)
 			else
 				format = "DXT1";
 			//cout << format << " " << img.width << " " << img.height << endl;
+
+			// Execute texture conversion
 			string imagePath = materials[j].baseTexture.string();
 			replace(imagePath.begin(), imagePath.end(), '/', '\\');
-			int size = snprintf(NULL, 0, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
-			char *command = new char[size + 1];
+			char command[512];
 			sprintf(command, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
 			//cout << command << endl;
 			system(command);
-			delete[] command;
 			cout << endl;
+
+			// Add newly created texture to created files
+			string fileName = materials[j].baseTexture.stem().string();
+			string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
+			createdFiles.push_back(outputFile);
 		}
 	}
 

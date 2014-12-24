@@ -62,20 +62,30 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 	for (int meshIndex = 0; meshIndex < fbxMeshes.Size(); meshIndex++)
 	{
 		FbxMesh *fbxMesh = (FbxMesh*)fbxMeshes[meshIndex]->GetNodeAttribute();
+		int numVertices = fbxMesh->GetPolygonVertexCount();
 		FbxVector4 *fbxVertices = fbxMesh->GetControlPoints();
 		int *fbxTriangles = fbxMesh->GetPolygonVertices();
+
 		FbxArray<FbxVector4> fbxNormals;
 		fbxMesh->GetPolygonVertexNormals(fbxNormals);
+
 		FbxArray<FbxVector2> fbxUvs;
-		FbxStringList uvNames;
-		fbxMesh->GetUVSetNames(uvNames);
-		fbxMesh->GetPolygonVertexUVs(uvNames[0], fbxUvs);
-		FbxGeometryElementMaterial *material = fbxMesh->GetElementMaterial(0);
+		bool hasUvs = (fbxMesh->GetElementUVCount() > 0);
+		if (hasUvs)
+		{
+			FbxStringList uvNames;
+			fbxMesh->GetUVSetNames(uvNames);
+			fbxMesh->GetPolygonVertexUVs(uvNames[0], fbxUvs);
+		}
+		//cout << "Uv Count: " << fbxUvs.GetCount() << endl;
+		//cout << "Polygon Vertex Count: " << fbxMesh->GetPolygonVertexCount() << endl;
+		//cout << "Control Point Count: " << fbxMesh->GetControlPointsCount() << endl;
+		//FbxGeometryElementMaterial *material = fbxMesh->GetElementMaterial(0);
 
 		// Group identical normals together with their associated vertices
 		// If a vertex contains more than one unique normal vector or uv vector, duplicate it so it can be compatible with Unity engine
-		int numVertices = fbxMesh->GetControlPointsCount();
-		vector<VertexGroupInfo> *vertexNormalGroups = new vector<VertexGroupInfo>[numVertices];
+		int numControlPoints = fbxMesh->GetControlPointsCount();
+		vector<VertexGroupInfo> *vertexNormalGroups = new vector<VertexGroupInfo>[numControlPoints];
 
 		for (int triangleIndex = 0; triangleIndex < fbxMesh->GetPolygonVertexCount(); triangleIndex++)
 		{
@@ -85,8 +95,8 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 			int size = vertexNormalGroups[vertexIndex].size();
 			for (int i = 0; i < size; i++)
 			{
-				if (vertexNormalGroups[vertexIndex][i].normal == fbxNormals[triangleIndex] &&
-					vertexNormalGroups[vertexIndex][i].uv == fbxUvs[triangleIndex]) // Duplicate normal and uv found
+				bool duplicateUv = (!hasUvs || vertexNormalGroups[vertexIndex][i].uv == fbxUvs[triangleIndex]);
+				if (vertexNormalGroups[vertexIndex][i].normal == fbxNormals[triangleIndex] && duplicateUv) // Duplicate normal and uv found
 				{
 					// Add new triangle index to existing group
 					vertexNormalGroups[vertexIndex][i].triangleIndices.push_back(triangleIndex);
@@ -98,7 +108,8 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 				// Add a new normal group
 				VertexGroupInfo info;
 				info.normal = fbxNormals[triangleIndex];
-				info.uv = fbxUvs[triangleIndex];
+				if (hasUvs)
+					info.uv = fbxUvs[triangleIndex];
 				info.triangleIndices.push_back(triangleIndex);
 				vertexNormalGroups[vertexIndex].push_back(info);
 			}
@@ -125,7 +136,7 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		FbxAMatrix transformMatrix(meshOffset, rotationOffset, FbxVector4(1, 1, 1));
 
 		// Construct Unity engine style mesh
-		for (int vertexIndex = 0; vertexIndex < numVertices; vertexIndex++)
+		for (int vertexIndex = 0; vertexIndex < numControlPoints; vertexIndex++)
 		{
 			int numNormalGroups = vertexNormalGroups[vertexIndex].size();
 
@@ -154,14 +165,17 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 				normals.push_back(normal);
 
 				// Add uv info to unity mesh
-				Vector2 uv;
-				uv.x = (float)fbxUvs[triangleIndices[0]][0];
-				uv.y = -(float)fbxUvs[triangleIndices[0]][1];
-				uvs.push_back(uv);
+				if (hasUvs)
+				{
+					Vector2 uv;
+					uv.x = (float)fbxUvs[triangleIndices[0]][0];
+					uv.y = -(float)fbxUvs[triangleIndices[0]][1];
+					uvs.push_back(uv);
+				}
 
 				for (int triangleIndex = 0; triangleIndex < numIndices; triangleIndex++)
 				{
-					// Add triangle info for unity mesh
+					// Add triangle info to unity mesh
 					int currentTriangleIndex = triangleIndices[triangleIndex];
 					triangles[startTriangleIndex + currentTriangleIndex] = currentVertexIndex;
 				}
