@@ -27,6 +27,7 @@ private:
 	bool GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes);
 	void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
 	void GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices);
+	path GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName);
 };
 
 struct VertexGroupInfo

@@ -62,8 +62,8 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 	for (int meshIndex = 0; meshIndex < fbxMeshes.Size(); meshIndex++)
 	{
 		FbxMesh *fbxMesh = (FbxMesh*)fbxMeshes[meshIndex]->GetNodeAttribute();
-		int numVertices = fbxMesh->GetPolygonVertexCount();
 		FbxVector4 *fbxVertices = fbxMesh->GetControlPoints();
+		int numTriangles = fbxMesh->GetPolygonVertexCount();
 		int *fbxTriangles = fbxMesh->GetPolygonVertices();
 
 		FbxArray<FbxVector4> fbxNormals;
@@ -84,10 +84,10 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 		// Group identical normals together with their associated vertices
 		// If a vertex contains more than one unique normal vector or uv vector, duplicate it so it can be compatible with Unity engine
-		int numControlPoints = fbxMesh->GetControlPointsCount();
-		vector<VertexGroupInfo> *vertexNormalGroups = new vector<VertexGroupInfo>[numControlPoints];
+		int numVertices = fbxMesh->GetControlPointsCount();
+		vector<VertexGroupInfo> *vertexNormalGroups = new vector<VertexGroupInfo>[numVertices];
 
-		for (int triangleIndex = 0; triangleIndex < fbxMesh->GetPolygonVertexCount(); triangleIndex++)
+		for (int triangleIndex = 0; triangleIndex < numTriangles; triangleIndex++)
 		{
 			int vertexIndex = fbxTriangles[triangleIndex];
 
@@ -136,7 +136,7 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		FbxAMatrix transformMatrix(meshOffset, rotationOffset, FbxVector4(1, 1, 1));
 
 		// Construct Unity engine style mesh
-		for (int vertexIndex = 0; vertexIndex < numControlPoints; vertexIndex++)
+		for (int vertexIndex = 0; vertexIndex < numVertices; vertexIndex++)
 		{
 			int numNormalGroups = vertexNormalGroups[vertexIndex].size();
 
@@ -342,10 +342,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 				Material materialProperties;
 
 				// Get diffuse info
-				FbxProperty diffuseProperty = material->FindProperty(FbxSurfaceMaterial::sDiffuse);
-				FbxFileTexture *diffuseFile = diffuseProperty.GetSrcObject<FbxFileTexture>();
-				if (diffuseFile)
-					materialProperties.diffuseMap = diffuseFile->GetFileName();
+				materialProperties.diffuseMap = GetTexturePath(material, FbxSurfaceMaterial::sDiffuse);
 				materialProperties.diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
 
 				// Get opacity info
@@ -355,27 +352,21 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 					materialProperties.opacity = opacityFactor;
 
 				// Get bump info
-				FbxProperty bumpProperty = material->FindProperty(FbxSurfaceMaterial::sBump);
-				FbxFileTexture *bumpFile = bumpProperty.GetSrcObject<FbxFileTexture>();
-				if (bumpFile)
-					materialProperties.bumpMap = bumpFile->GetFileName();
+				materialProperties.normalMap = GetTexturePath(material, FbxSurfaceMaterial::sNormalMap);
 
 				// Get specular info
 				FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
 				materialProperties.hasSpecular = (specularFactor > 0);
 				if (materialProperties.hasSpecular)
 				{
-					FbxProperty specularProperty = material->FindProperty(FbxSurfaceMaterial::sSpecular);
-					FbxFileTexture *specularFile = specularProperty.GetSrcObject<FbxFileTexture>();
-					if (specularFile)
-						materialProperties.specularMap = specularFile->GetFileName();
-
+					materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
 					materialProperties.specularColor = ((FbxSurfacePhong*)material)->Specular;
-					materialProperties.specularFactor = ((FbxSurfacePhong*)material)->Shininess;
+					materialProperties.specularFactor = specularFactor;
 				}
 
 				// Get uv info
-				FbxTexture *texture = diffuseProperty.GetSrcObject<FbxTexture>();
+				FbxProperty property = material->FindProperty(FbxSurfaceMaterial::sDiffuse);
+				FbxTexture *texture = property.GetSrcObject<FbxTexture>();
 				if (texture)
 				{
 					materialProperties.uvScaling[0] = texture->GetScaleU();
@@ -444,6 +435,22 @@ void MeshImporter::GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndice
 		}
 		//cout << endl << endl;
 	}
+}
+
+path MeshImporter::GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName)
+{
+	FbxProperty property = material->FindProperty(propertyName);
+	if (property.IsValid())
+	{
+		FbxTexture* texture = property.GetSrcObject<FbxTexture>();
+		if (texture)
+		{
+			FbxFileTexture *file = FbxCast<FbxFileTexture>(texture);
+			return file->GetFileName();
+		}
+	}
+
+	return "";
 }
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix)

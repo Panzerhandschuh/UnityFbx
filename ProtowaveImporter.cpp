@@ -23,7 +23,8 @@ void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFile
 void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
-void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
+void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
+void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles);
 int RoundToNearestPow2(int num);
 void EndApp(int success);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
@@ -153,7 +154,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		{
 			// Create files
 			vector<string> createdFiles;
-			CreateTextureFiles(texturesDir, meshes, createdFiles);
+			CreateDDSFiles(texturesDir, meshes, createdFiles);
 			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwmdl");
 			WriteMaterialsToFile(outputFile, texturesDir, meshes);
 			WriteMeshesToFile(outputFile, meshes, importNormals);
@@ -332,7 +333,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 	file.close();
 }
 
-void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
+void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
 {
 	string texconvPath = initial_path().string() + "\\texconv.exe";
 	if (!exists(texconvPath))
@@ -341,66 +342,14 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 		return;
 	}
 
-	// Create DDS files
 	for (unsigned int i = 0; i < meshes.size(); i++)
 	{
 		vector<Material> materials = meshes[i].materials;
 		for (unsigned int j = 0; j < materials.size(); j++)
 		{
-			if (!ImageInfo::IsValidImage(materials[j].diffuseMap))
-			{
-				materials[j].diffuseMap = "";
-				continue;
-			}
-
-			string newTexturePath = materialsDir.string() + "\\" + materials[j].diffuseMap.filename().string();
-			if (boost::iequals(materials[j].diffuseMap.extension().string(), ".dds")) // Copy the source file
-			{
-				try
-				{
-					copy_file(materials[j].diffuseMap, newTexturePath, copy_option::overwrite_if_exists);
-				}
-				catch (exception &e)
-				{
-					cout << e.what() << endl;
-					materials[j].diffuseMap = "";
-					continue;
-				}
-				continue;
-			}
-
-			ImageInfo::ImageData img;
-			if (!ImageInfo::GetImageInfo(materials[j].diffuseMap, img))
-			{
-				cout << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
-				materials[j].diffuseMap = "";
-				continue;
-			}
-			img.width = RoundToNearestPow2(img.width);
-			img.height = RoundToNearestPow2(img.height);
-			//int smaller = min(img.width, img.height);
-			//int numMipMaps = (log(smaller) / log(2)) + 1;
-
-			string format;
-			if (img.hasAlpha)
-				format = "DXT5";
-			else
-				format = "DXT1";
-			//cout << format << " " << img.width << " " << img.height << endl;
-
-			// Execute texture conversion
-			string imagePath = materials[j].diffuseMap.string();
-			replace(imagePath.begin(), imagePath.end(), '/', '\\');
-			char command[512];
-			sprintf(command, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
-			//cout << command << endl;
-			system(command);
-			cout << endl;
-
-			// Add newly created texture to created files
-			string fileName = materials[j].diffuseMap.stem().string();
-			string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
-			createdFiles.push_back(outputFile);
+			CreateDDSFile(materialsDir, materials[j].diffuseMap, createdFiles);
+			CreateDDSFile(materialsDir, materials[j].normalMap, createdFiles);
+			CreateDDSFile(materialsDir, materials[j].specularMap, createdFiles);
 		}
 	}
 
@@ -415,6 +364,64 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 			cout << endl;
 		}
 	}
+}
+
+void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles)
+{
+	if (!ImageInfo::IsValidImage(texturePath)) // The image is not valid
+	{
+		texturePath = "";
+		return;
+	}
+
+	string fileName = texturePath.stem().string();
+	string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
+	if (boost::iequals(texturePath.extension().string(), ".dds")) // Copy the source file if it is already a .dds
+	{
+		try
+		{
+			copy_file(texturePath, outputFile, copy_option::overwrite_if_exists);
+			createdFiles.push_back(outputFile);
+		}
+		catch (exception &e)
+		{
+			cout << e.what() << endl;
+			texturePath = "";
+		}
+		return;
+	}
+
+	// Convert valid, non-dds image to dds
+	ImageInfo::ImageData img;
+	if (!ImageInfo::GetImageInfo(texturePath, img)) // Error retrieving image info
+	{
+		cout << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
+		texturePath = "";
+		return;
+	}
+	img.width = RoundToNearestPow2(img.width);
+	img.height = RoundToNearestPow2(img.height);
+	//int smaller = min(img.width, img.height);
+	//int numMipMaps = (log(smaller) / log(2)) + 1;
+
+	string format;
+	if (img.hasAlpha)
+		format = "DXT5";
+	else
+		format = "DXT1";
+	//cout << format << " " << img.width << " " << img.height << endl;
+
+	// Execute texture conversion
+	string imagePath = texturePath.string();
+	replace(imagePath.begin(), imagePath.end(), '/', '\\');
+	char command[512];
+	sprintf(command, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
+	//cout << command << endl;
+	system(command);
+	cout << endl;
+
+	// Add newly created texture to created files
+	createdFiles.push_back(outputFile);
 }
 
 int RoundToNearestPow2(int num)
@@ -476,9 +483,9 @@ void PrintMaterial(const Material &mat)
 	if (mat.hasOpacity)
 		cout << "Opacity: " << mat.opacity << endl;
 
-	// Bump info
-	if (!mat.bumpMap.empty())
-		cout << "Bump Map: " << mat.bumpMap.stem().string() << endl;
+	// Normal map info
+	if (!mat.normalMap.empty())
+		cout << "Normal Map: " << mat.normalMap.stem().string() << endl;
 
 	// Specular info
 	if (mat.hasSpecular)
@@ -516,11 +523,11 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 	if (mat.hasOpacity)
 		os << "\t" << "Opacity " << mat.opacity << endl;
 
-	// Bump map info
-	if (!mat.bumpMap.empty())
+	// Normal map info
+	if (!mat.normalMap.empty())
 	{
-		string textureName = mat.bumpMap.stem().string();
-		os << "\t" << "BumpMap " << pwmdlFileName << "\\" << textureName << endl;
+		string textureName = mat.normalMap.stem().string();
+		os << "\t" << "NormalMap " << pwmdlFileName << "\\" << textureName << endl;
 	}
 
 	// Specular info

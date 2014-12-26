@@ -14,7 +14,7 @@ struct Material
 	FbxDouble3 diffuseColor;
 	bool hasOpacity;
 	FbxDouble opacity;
-	path bumpMap;
+	path normalMap;
 	bool hasSpecular;
 	path specularMap;
 	FbxDouble3 specularColor;
@@ -27,7 +27,7 @@ struct Material
 	{
 		return (diffuseMap == mat.diffuseMap && diffuseColor == mat.diffuseColor &&
 			hasOpacity == mat.hasOpacity && opacity == mat.opacity &&
-			bumpMap == mat.bumpMap && hasSpecular == mat.hasSpecular && 
+			normalMap == mat.normalMap && hasSpecular == mat.hasSpecular &&
 			specularMap == mat.specularMap && specularColor == mat.specularColor && 
 			specularFactor == mat.specularFactor && uvScaling == mat.uvScaling && 
 			uvTranslation == mat.uvTranslation && uvRotation == mat.uvRotation);
