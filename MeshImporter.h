@@ -38,6 +38,5 @@ struct VertexGroupInfo
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix);
 FbxVector4& operator*=(FbxVector4 &vector, const FbxAMatrix &matrix);
-ostream& operator<<(ostream& os, const Material &mat);
 
 #endif

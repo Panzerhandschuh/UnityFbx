@@ -26,6 +26,14 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
 int RoundToNearestPow2(int num);
 void EndApp(int success);
+ostream& operator<<(ostream& os, const FbxDouble2 &d2);
+ostream& operator<<(ostream& os, const FbxDouble3 &d3);
+ofstream& operator<<(ofstream& os, const FbxDouble2 &d2);
+ofstream& operator<<(ofstream& os, const FbxDouble3 &d3);
+void PrintColor(const FbxDouble3 &d3);
+void WriteColor(ofstream& os, const FbxDouble3 &d3);
+void PrintMaterial(const Material &mat);
+void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -313,28 +321,11 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 			vector<Material> materials = meshes[i].materials;
 			file << "Material" << j << endl;
 			file << "{" << endl;
-			if (!materials[j].baseTexture.empty())
-			{
-				string textureName = materials[j].baseTexture.stem().string();
-				file << "\t" << "BaseTexture " << pwmdlFileName << "\\" << textureName << endl;
-			}
-			if (!materials[j].bumpMap.empty())
-			{
-				string textureName = materials[j].bumpMap.stem().string();
-				file << "\t" << "BumpMap " << pwmdlFileName << "\\" << textureName << endl;
-			}
-			file << "\t" << "Diffuse " << (int)(materials[j].diffuse[0] * 255) << " " <<
-				(int)(materials[j].diffuse[1] * 255) << " " << (int)(materials[j].diffuse[2] * 255) << endl;
-			if (materials[j].hasSpecular)
-				file << "\t" << "Specular " << (int)(materials[j].specular[0] * 255) << " " <<
-				(int)(materials[j].specular[1] * 255) << " " << (int)(materials[j].specular[2] * 255) << " " <<
-				materials[j].shininess << endl;
-			if (materials[j].uvScaling != FbxDouble3(1, 1, 1))
-				file << "\t" << "Tiling " << materials[j].uvScaling[0] << " " << materials[j].uvScaling[1] << endl;
-			if (materials[j].uvTranslation != FbxDouble3(0, 0, 0))
-				file << "\t" << "Offset " << materials[j].uvTranslation[0] << " " << materials[j].uvTranslation[1] << endl;
+
+			WriteMaterial(file, materials[j], pwmdlFileName);
+
 			file << "}";
-			if (j != materials.size() - 1)
+			if (j != materials.size() - 1) // Create line spacing if this is not the last material
 				file << endl << endl;
 		}
 	}
@@ -353,36 +344,36 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 	// Create DDS files
 	for (unsigned int i = 0; i < meshes.size(); i++)
 	{
-		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
+		vector<Material> materials = meshes[i].materials;
+		for (unsigned int j = 0; j < materials.size(); j++)
 		{
-			vector<Material> materials = meshes[i].materials;
-			if (!ImageInfo::IsValidImage(materials[j].baseTexture))
+			if (!ImageInfo::IsValidImage(materials[j].diffuseMap))
 			{
-				materials[j].baseTexture = "";
+				materials[j].diffuseMap = "";
 				continue;
 			}
 
-			string newTexturePath = materialsDir.string() + "\\" + materials[j].baseTexture.filename().string();
-			if (boost::iequals(materials[j].baseTexture.extension().string(), ".dds")) // Copy the source file
+			string newTexturePath = materialsDir.string() + "\\" + materials[j].diffuseMap.filename().string();
+			if (boost::iequals(materials[j].diffuseMap.extension().string(), ".dds")) // Copy the source file
 			{
 				try
 				{
-					copy_file(materials[j].baseTexture, newTexturePath, copy_option::overwrite_if_exists);
+					copy_file(materials[j].diffuseMap, newTexturePath, copy_option::overwrite_if_exists);
 				}
 				catch (exception &e)
 				{
 					cout << e.what() << endl;
-					materials[j].baseTexture = "";
+					materials[j].diffuseMap = "";
 					continue;
 				}
 				continue;
 			}
 
 			ImageInfo::ImageData img;
-			if (!ImageInfo::GetImageInfo(materials[j].baseTexture, img))
+			if (!ImageInfo::GetImageInfo(materials[j].diffuseMap, img))
 			{
 				cout << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
-				materials[j].baseTexture = "";
+				materials[j].diffuseMap = "";
 				continue;
 			}
 			img.width = RoundToNearestPow2(img.width);
@@ -398,7 +389,7 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 			//cout << format << " " << img.width << " " << img.height << endl;
 
 			// Execute texture conversion
-			string imagePath = materials[j].baseTexture.string();
+			string imagePath = materials[j].diffuseMap.string();
 			replace(imagePath.begin(), imagePath.end(), '/', '\\');
 			char command[512];
 			sprintf(command, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
@@ -407,7 +398,7 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 			cout << endl;
 
 			// Add newly created texture to created files
-			string fileName = materials[j].baseTexture.stem().string();
+			string fileName = materials[j].diffuseMap.stem().string();
 			string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
 			createdFiles.push_back(outputFile);
 		}
@@ -420,7 +411,7 @@ void CreateTextureFiles(const path &materialsDir, vector<Mesh> &meshes, vector<s
 		{
 			vector<Material> materials = meshes[i].materials;
 			cout << "Material " << j << ":" << endl;
-			cout << materials[j];
+			PrintMaterial(materials[j]);
 			cout << endl;
 		}
 	}
@@ -436,4 +427,125 @@ void EndApp(int success)
 	cout << "Press enter to continue...";
 	cin.ignore();
 	exit(success);
+}
+
+ostream& operator<<(ostream& os, const FbxDouble2 &d2)
+{
+	os << d2[0] << " " << d2[1];
+	return os;
+}
+
+ostream& operator<<(ostream& os, const FbxDouble3 &d3)
+{
+	os << d3[0] << " " << d3[1] << " " << d3[2];
+	return os;
+}
+
+ofstream& operator<<(ofstream& os, const FbxDouble2 &d2)
+{
+	os << d2[0] << " " << d2[1];
+	return os;
+}
+
+ofstream& operator<<(ofstream& os, const FbxDouble3 &d3)
+{
+	os << d3[0] << " " << d3[1] << " " << d3[2];
+	return os;
+}
+
+void PrintColor(const FbxDouble3 &d3)
+{
+	cout << "R:" << (int)(d3[0] * 255) << " G:" << (int)(d3[1] * 255) << " B:" << (int)(d3[2] * 255);
+}
+
+void WriteColor(ofstream& os, const FbxDouble3 &d3)
+{
+	os << (int)(d3[0] * 255) << " " << (int)(d3[1] * 255) << " " << (int)(d3[2] * 255);
+}
+
+void PrintMaterial(const Material &mat)
+{
+	// Diffuse info
+	if (!mat.diffuseMap.empty())
+		cout << "Diffuse Map: " << mat.diffuseMap.stem().string() << endl;
+	cout << "Diffuse Color: ";
+	PrintColor(mat.diffuseColor);
+	cout << endl;
+
+	// Opacity info
+	if (mat.hasOpacity)
+		cout << "Opacity: " << mat.opacity << endl;
+
+	// Bump info
+	if (!mat.bumpMap.empty())
+	{
+		cout << "Bump Map: " << mat.bumpMap.stem().string() << endl;
+		cout << "Bump Factor: " << mat.bumpFactor << endl;
+	}
+
+	// Specular info
+	if (mat.hasSpecular)
+	{
+		if (!mat.specularMap.empty())
+			cout << "Specular Map: " << mat.specularMap.stem().string() << endl;
+		cout << "Specular Color: ";
+		PrintColor(mat.specularColor);
+		cout << endl;
+		cout << "Specular Factor: " << mat.specularFactor << endl;
+	}
+
+	// UV info
+	if (mat.uvScaling != FbxDouble2(1, 1))
+		cout << "Tiling: " << mat.uvScaling << endl;
+	if (mat.uvTranslation != FbxDouble2(0, 0))
+		cout << "Offset: " << mat.uvTranslation << endl;
+	if (mat.uvRotation != FbxDouble3(0, 0, 0))
+		cout << "Rotation: " << mat.uvRotation << endl;
+}
+
+void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName)
+{
+	// Diffuse info
+	if (!mat.diffuseMap.empty())
+	{
+		string textureName = mat.diffuseMap.stem().string();
+		os << "\t" << "DiffuseMap " << pwmdlFileName << "\\" << textureName << endl;
+	}
+	os << "\t" << "DiffuseColor ";
+	WriteColor(os, mat.diffuseColor);
+	os << endl;
+
+	// Opacity info
+	if (mat.hasOpacity)
+		os << "\t" << "Opacity " << mat.opacity << endl;
+
+	// Bump map info
+	if (!mat.bumpMap.empty())
+	{
+		string textureName = mat.bumpMap.stem().string();
+		os << "\t" << "BumpMap " << pwmdlFileName << "\\" << textureName << endl;
+		os << "\t" << "BumpFactor " << mat.bumpFactor << endl;
+	}
+
+	// Specular info
+	if (mat.hasSpecular)
+	{
+		if (!mat.specularMap.empty())
+		{
+			string textureName = mat.specularMap.stem().string();
+			os << "\t" << "SpecularMap " << pwmdlFileName << "\\" << textureName << endl;
+		}
+		os << "\t" << "SpecularColor ";
+		WriteColor(os, mat.specularColor);
+		os << endl;
+		os << "\t" << "SpecularFactor " << mat.specularFactor << endl;
+	}
+
+	// UV info
+	if (mat.uvScaling != FbxDouble2(1, 1))
+		os << "\t" << "Tiling " << mat.uvScaling << endl;
+	if (mat.uvTranslation != FbxDouble2(0, 0))
+		os << "\t" << "Offset " << mat.uvTranslation << endl;
+	if (mat.uvRotation != FbxDouble3(0, 0, 0))
+		os << "\t" << "Rotation " << mat.uvRotation << endl;
 }

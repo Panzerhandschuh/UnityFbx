@@ -10,21 +10,29 @@ using namespace boost::filesystem;
 
 struct Material
 {
-	path baseTexture;
+	path diffuseMap;
+	FbxDouble3 diffuseColor;
+	bool hasOpacity;
+	FbxDouble opacity;
 	path bumpMap;
-	FbxDouble3 diffuse;
+	FbxDouble bumpFactor;
 	bool hasSpecular;
-	FbxDouble3 specular;
-	FbxDouble shininess;
-	FbxDouble3 uvScaling;
-	FbxDouble3 uvTranslation;
+	path specularMap;
+	FbxDouble3 specularColor;
+	FbxDouble specularFactor;
+	FbxDouble2 uvScaling;
+	FbxDouble2 uvTranslation;
+	FbxDouble3 uvRotation;
 
 	bool operator==(const Material &mat)
 	{
-		return (baseTexture == mat.baseTexture && bumpMap == mat.bumpMap &&
-			diffuse == mat.diffuse && hasSpecular == mat.hasSpecular &&
-			specular == mat.specular && shininess == mat.shininess &&
-			uvScaling == mat.uvScaling && uvTranslation == mat.uvTranslation);
+		return (diffuseMap == mat.diffuseMap && diffuseColor == mat.diffuseColor &&
+			hasOpacity == mat.hasOpacity && opacity == mat.opacity &&
+			bumpMap == mat.bumpMap && bumpFactor == mat.bumpFactor &&
+			hasSpecular == mat.hasSpecular && specularMap == mat.specularMap &&
+			specularColor == mat.specularColor && specularFactor == mat.specularFactor &&
+			uvScaling == mat.uvScaling && uvTranslation == mat.uvTranslation && 
+			uvRotation == mat.uvRotation);
 	}
 };
 

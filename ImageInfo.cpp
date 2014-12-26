@@ -37,7 +37,10 @@ bool ImageInfo::IsValidImage(const path &imagePath)
 		boost::iequals(extension, ".tga"))
 		return true;
 	else
+	{
+		cout << "Unsupported image format detected (" << extension << ")" << endl;
 		return false;
+	}
 }
 
 bool ImageInfo::GetBmpInfo(FILE *file, ImageData &img)

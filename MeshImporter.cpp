@@ -301,7 +301,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 			Material materialProperties;
 			FbxDouble diffuseValue = 150.0 / 255.0;
 			FbxDouble3 defaultDiffuse(diffuseValue, diffuseValue, diffuseValue);
-			materialProperties.diffuse = defaultDiffuse;
+			materialProperties.diffuseColor = defaultDiffuse;
 			materialProperties.hasSpecular = false;
 			// Check for duplicate material
 			vector<Material>::iterator it = find(materials.begin(), materials.end(), materialProperties);
@@ -340,47 +340,69 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 
 				// Get material info
 				Material materialProperties;
-				FbxProperty property = material->FindProperty(FbxLayerElement::sTextureChannelNames[0]);
-				FbxFileTexture *fileTexture = property.GetSrcObject<FbxFileTexture>();
-				FbxTexture *texture = property.GetSrcObject<FbxTexture>();
-				if (fileTexture)
+
+				// Get diffuse info
+				FbxProperty diffuseProperty = material->FindProperty(FbxSurfaceMaterial::sDiffuse);
+				FbxFileTexture *diffuseFile = diffuseProperty.GetSrcObject<FbxFileTexture>();
+				if (diffuseFile)
+					materialProperties.diffuseMap = diffuseFile->GetFileName();
+				materialProperties.diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
+
+				// Get opacity info
+				FbxDouble opacityFactor = ((FbxSurfacePhong*)material)->TransparencyFactor;
+				materialProperties.hasOpacity = (opacityFactor > 0);
+				if (materialProperties.hasOpacity)
+					materialProperties.opacity = opacityFactor;
+
+				// Get bump info
+				FbxProperty bumpProperty = material->FindProperty(FbxSurfaceMaterial::sBump);
+				FbxFileTexture *bumpFile = bumpProperty.GetSrcObject<FbxFileTexture>();
+				if (bumpFile)
 				{
-					//cout << fileTexture->GetFileName() << endl;
-					materialProperties.baseTexture = fileTexture->GetFileName();
+					materialProperties.bumpMap = bumpFile->GetFileName();
+					materialProperties.bumpFactor = ((FbxSurfacePhong*)material)->BumpFactor;
 				}
+
+				// Get specular info
+				FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
+				materialProperties.hasSpecular = (specularFactor > 0);
+				if (materialProperties.hasSpecular)
+				{
+					FbxProperty specularProperty = material->FindProperty(FbxSurfaceMaterial::sSpecular);
+					FbxFileTexture *specularFile = specularProperty.GetSrcObject<FbxFileTexture>();
+					if (specularFile)
+						materialProperties.specularMap = specularFile->GetFileName();
+
+					materialProperties.specularColor = ((FbxSurfacePhong*)material)->Specular;
+					materialProperties.specularFactor = ((FbxSurfacePhong*)material)->Shininess;
+				}
+
+				// Get uv info
+				FbxTexture *texture = diffuseProperty.GetSrcObject<FbxTexture>();
 				if (texture)
 				{
-					materialProperties.uvScaling = texture->Scaling;
-					materialProperties.uvTranslation = texture->Translation;
-				}
+					materialProperties.uvScaling[0] = texture->GetScaleU();
+					materialProperties.uvScaling[1] = texture->GetScaleV();
 
-				// Get mesh shaders such as diffuse, specular, transparent (always has diffuse)
-				FbxDouble3 diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
-				materialProperties.diffuse = diffuseColor;
+					materialProperties.uvTranslation[0] = texture->GetTranslationU();
+					materialProperties.uvTranslation[1] = texture->GetTranslationV();
 
-				FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
-				if (specularFactor > 0)
-				{
-					FbxDouble3 specularColor = ((FbxSurfacePhong*)material)->Specular;
-					FbxDouble specularShininess = ((FbxSurfacePhong*)material)->Shininess;
-					materialProperties.hasSpecular = true;
-					materialProperties.specular = specularColor;
-					materialProperties.shininess = specularShininess;
+					materialProperties.uvRotation[0] = texture->GetRotationU();
+					materialProperties.uvRotation[1] = texture->GetRotationV();
+					materialProperties.uvRotation[2] = texture->GetRotationW();
 				}
-				else
-					materialProperties.hasSpecular = false;
 
 				// Check if this is a duplicate material
 				vector<Material>::iterator it = find(materials.begin(), materials.end(), materialProperties);
 				if (it != materials.end()) // Duplicate found, set material indices to duplicate indices
 				{
-					//cout << "dup" << endl;
+					//cout << "Duplicate material found" << endl;
 					int index = distance(materials.begin(), it);
 					replace(currentMaterialIndices.begin(), currentMaterialIndices.end(), materialIndex, index);
 				}
 				else // No duplicate exists
 				{
-					//cout << "no dup" << endl;
+					//cout << "No duplicate material found" << endl;
 					materials.push_back(materialProperties);
 					for (unsigned int i = 0; i < currentMaterialIndices.size(); i++) // Set material offsets
 					{
@@ -425,27 +447,6 @@ void MeshImporter::GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndice
 		}
 		//cout << endl << endl;
 	}
-}
-
-ostream& operator<<(ostream& os, const Material &mat)
-{
-	if (!mat.baseTexture.empty())
-		os << "Base Texture: " << mat.baseTexture.stem().string() << endl;
-	if (!mat.bumpMap.empty())
-		os << "Bump Map: " << mat.bumpMap.stem().string() << endl;
-	os << "Diffuse: R:" << (int)(mat.diffuse[0] * 255) << " G:" <<
-		(int)(mat.diffuse[1] * 255) << " B:" << (int)(mat.diffuse[2] * 255) << endl;
-	if (mat.hasSpecular)
-	{
-		os << "Specular: R:" << (int)(mat.specular[0] * 255) << " G:" <<
-			(int)(mat.specular[1] * 255) << " B:" << (int)(mat.specular[2] * 255) <<
-			" Shininess:" << mat.shininess << endl;
-	}
-	if (mat.uvScaling != FbxDouble3(1, 1, 1))
-		os << "Tiling: " << mat.uvScaling[0] << " " << mat.uvScaling[1] << endl;
-	if (mat.uvTranslation != FbxDouble3(0, 0, 0))
-		os << "Offset: " << mat.uvTranslation[0] << " " << mat.uvTranslation[1] << endl;
-	return os;
 }
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix)
