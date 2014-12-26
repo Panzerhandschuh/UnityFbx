@@ -358,10 +358,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 				FbxProperty bumpProperty = material->FindProperty(FbxSurfaceMaterial::sBump);
 				FbxFileTexture *bumpFile = bumpProperty.GetSrcObject<FbxFileTexture>();
 				if (bumpFile)
-				{
 					materialProperties.bumpMap = bumpFile->GetFileName();
-					materialProperties.bumpFactor = ((FbxSurfacePhong*)material)->BumpFactor;
-				}
 
 				// Get specular info
 				FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;

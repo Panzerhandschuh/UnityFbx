@@ -478,10 +478,7 @@ void PrintMaterial(const Material &mat)
 
 	// Bump info
 	if (!mat.bumpMap.empty())
-	{
 		cout << "Bump Map: " << mat.bumpMap.stem().string() << endl;
-		cout << "Bump Factor: " << mat.bumpFactor << endl;
-	}
 
 	// Specular info
 	if (mat.hasSpecular)
@@ -524,7 +521,6 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 	{
 		string textureName = mat.bumpMap.stem().string();
 		os << "\t" << "BumpMap " << pwmdlFileName << "\\" << textureName << endl;
-		os << "\t" << "BumpFactor " << mat.bumpFactor << endl;
 	}
 
 	// Specular info
