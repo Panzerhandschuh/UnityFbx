@@ -368,10 +368,6 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 
 					materialProperties.uvTranslation[0] = texture->GetTranslationU();
 					materialProperties.uvTranslation[1] = texture->GetTranslationV();
-
-					materialProperties.uvRotation[0] = texture->GetRotationU();
-					materialProperties.uvRotation[1] = texture->GetRotationV();
-					materialProperties.uvRotation[2] = texture->GetRotationW();
 				}
 
 				// Check if this is a duplicate material

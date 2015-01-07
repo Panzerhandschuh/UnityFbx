@@ -35,6 +35,7 @@ void PrintColor(const FbxDouble3 &d3);
 void WriteColor(ofstream& os, const FbxDouble3 &d3);
 void PrintMaterial(const Material &mat);
 void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName);
+bool AlmostEqual(const FbxDouble2& d1, const FbxDouble2& d2);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -495,12 +496,10 @@ void PrintMaterial(const Material &mat)
 	}
 
 	// UV info
-	if (mat.uvScaling != FbxDouble2(1, 1))
+	if (!AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
 		cout << "Tiling: " << mat.uvScaling << endl;
-	if (mat.uvTranslation != FbxDouble2(0, 0))
+	if (!AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
 		cout << "Offset: " << mat.uvTranslation << endl;
-	if (mat.uvRotation != FbxDouble3(0, 0, 0))
-		cout << "Rotation: " << mat.uvRotation << endl;
 }
 
 void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName)
@@ -541,10 +540,14 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 	}
 
 	// UV info
-	if (mat.uvScaling != FbxDouble2(1, 1))
+	if (!AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
 		os << "\t" << "Tiling " << mat.uvScaling << endl;
-	if (mat.uvTranslation != FbxDouble2(0, 0))
+	if (!AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
 		os << "\t" << "Offset " << mat.uvTranslation << endl;
-	if (mat.uvRotation != FbxDouble3(0, 0, 0))
-		os << "\t" << "Rotation " << mat.uvRotation << endl;
+}
+
+bool AlmostEqual(const FbxDouble2& d1, const FbxDouble2& d2)
+{
+	const FbxDouble epsilon = 0.0001;
+	return (fabs(d1[0] - d2[0]) < epsilon && fabs(d1[1] - d2[1]) < epsilon);
 }

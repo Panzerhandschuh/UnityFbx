@@ -21,7 +21,6 @@ struct Material
 	FbxDouble specularFactor;
 	FbxDouble2 uvScaling;
 	FbxDouble2 uvTranslation;
-	FbxDouble3 uvRotation;
 
 	bool operator==(const Material &mat)
 	{
@@ -30,7 +29,7 @@ struct Material
 			normalMap == mat.normalMap && hasSpecular == mat.hasSpecular &&
 			specularMap == mat.specularMap && specularColor == mat.specularColor && 
 			specularFactor == mat.specularFactor && uvScaling == mat.uvScaling && 
-			uvTranslation == mat.uvTranslation && uvRotation == mat.uvRotation);
+			uvTranslation == mat.uvTranslation);
 	}
 };
 
