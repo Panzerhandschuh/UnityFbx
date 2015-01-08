@@ -102,9 +102,13 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 		}
 		else if (_tcscmp(argv[i], L"-collider") == 0)
+		{
 			isCollider = true;
+		}
 		else if (_tcscmp(argv[i], L"-nonormals") == 0)
+		{
 			importNormals = false;
+		}
 		else
 		{
 			cout << "Error: Invalid argument (" << argv[i] << ")" << endl;

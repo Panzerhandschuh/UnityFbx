@@ -117,7 +117,13 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 		// Mesh position offset info
 		FbxDouble3 meshPosition = fbxMeshes[meshIndex]->LclTranslation.Get();
-		FbxVector4 meshOffset(meshPosition[0], meshPosition[2], meshPosition[1]); // Mesh position indices are intentional to account for axis conversion
+		if (meshIndex == 0)
+			centerPivotPoint = fbxMeshes[meshIndex]->LclTranslation.Get();
+
+		FbxVector4 meshOffset;
+		meshOffset[0] = centerPivotPoint[0] - meshPosition[0];
+		meshOffset[2] = centerPivotPoint[1] - meshPosition[1]; // The offset index is intentional to account for axis conversion
+		meshOffset[1] = centerPivotPoint[2] - meshPosition[2];
 
 		FbxVector4 rotationOffset = fbxMeshes[meshIndex]->LclRotation.Get();
 		rotationOffset[0] -= 90;
