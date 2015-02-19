@@ -299,10 +299,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 			//cout << "no mats" << endl;
 			// Create default material
 			Material materialProperties;
-			FbxDouble diffuseValue = 150.0 / 255.0;
-			FbxDouble3 defaultDiffuse(diffuseValue, diffuseValue, diffuseValue);
-			materialProperties.diffuseColor = defaultDiffuse;
-			materialProperties.hasSpecular = false;
+			Material::LoadDefault(materialProperties);
 			// Check for duplicate material
 			vector<Material>::iterator it = find(materials.begin(), materials.end(), materialProperties);
 			if (it != materials.end()) // Duplicate exists, copy material ids from duplicate
@@ -340,28 +337,39 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 
 				// Get material info
 				Material materialProperties;
-
-				// Get diffuse info
 				materialProperties.diffuseMap = GetTexturePath(material, FbxSurfaceMaterial::sDiffuse);
-				materialProperties.diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
-
-				// Get opacity info
-				FbxDouble opacityFactor = ((FbxSurfacePhong*)material)->TransparencyFactor;
-				materialProperties.hasOpacity = (opacityFactor > 0);
-				if (materialProperties.hasOpacity)
-					materialProperties.opacity = opacityFactor;
-
-				// Get bump info
 				materialProperties.normalMap = GetTexturePath(material, FbxSurfaceMaterial::sNormalMap);
-
-				// Get specular info
-				FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
-				materialProperties.hasSpecular = (specularFactor > 0);
-				if (materialProperties.hasSpecular)
+				if (material->GetClassId().Is(FbxSurfacePhong::ClassId))
 				{
-					materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
-					materialProperties.specularColor = ((FbxSurfacePhong*)material)->Specular;
-					materialProperties.specularFactor = specularFactor;
+					materialProperties.diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
+
+					FbxDouble opacityFactor = ((FbxSurfacePhong*)material)->TransparencyFactor;
+					materialProperties.hasOpacity = opacityFactor > 0;
+					if (materialProperties.hasOpacity)
+						materialProperties.opacity = opacityFactor;
+
+					FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
+					materialProperties.hasSpecular = specularFactor > 0;
+					if (materialProperties.hasSpecular)
+					{
+						materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
+						materialProperties.specularColor = ((FbxSurfacePhong*)material)->Specular;
+						materialProperties.specularFactor = specularFactor;
+					}
+				}
+				else if (material->GetClassId().Is(FbxSurfaceLambert::ClassId))
+				{
+					materialProperties.diffuseColor = ((FbxSurfaceLambert*)material)->Diffuse;
+
+					FbxDouble opacityFactor = ((FbxSurfaceLambert*)material)->TransparencyFactor;
+					materialProperties.hasOpacity = opacityFactor > 0;
+					if (materialProperties.hasOpacity)
+						materialProperties.opacity = opacityFactor;
+				}
+				else
+				{
+					Material::LoadDefault(materialProperties);
+					cout << "Warning: Unknown material type" << endl;
 				}
 
 				// Get uv info

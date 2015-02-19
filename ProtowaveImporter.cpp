@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <boost/filesystem/path.hpp>
+#include "Common.h"
 #include "Mesh.h"
 #include "MeshImporter.h"
 #include "Serializer.h"
@@ -25,7 +26,6 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
 void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
 void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles);
-int RoundToNearestPow2(int num);
 void EndApp(int success);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
 ostream& operator<<(ostream& os, const FbxDouble3 &d3);
@@ -35,12 +35,12 @@ void PrintColor(const FbxDouble3 &d3);
 void WriteColor(ofstream& os, const FbxDouble3 &d3);
 void PrintMaterial(const Material &mat);
 void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName);
-bool AlmostEqual(const FbxDouble2& d1, const FbxDouble2& d2);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
 	//argc = 2;
-	//argv[1] = L"D:\\Users\\Tyler\\Documents\\Protowave\\Importer\\StandardToPipe.FBX";
+	//argv[1] = L"D:\\Users\\Tyler\\Documents\\Protowave\\Importer\\Pipe.FBX";
+
 	//argv[2] = L"C:\\Users\\Tyler\\Documents\\Protowave\\Models\\Model.pwm";
 	//argv[3] = L"-materials";
 	//argv[4] = L"C:\\Users\\Tyler\\Documents\\Protowave\\Materials\\Model";
@@ -102,13 +102,9 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 		}
 		else if (_tcscmp(argv[i], L"-collider") == 0)
-		{
 			isCollider = true;
-		}
 		else if (_tcscmp(argv[i], L"-nonormals") == 0)
-		{
 			importNormals = false;
-		}
 		else
 		{
 			cout << "Error: Invalid argument (" << argv[i] << ")" << endl;
@@ -337,22 +333,21 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
 {
 	string texconvPath = initial_path().string() + "\\texconv.exe";
-	if (!exists(texconvPath))
+	if (exists(texconvPath))
 	{
-		cout << "Missing texconv.exe, textures will not be saved." << endl;
-		return;
-	}
-
-	for (unsigned int i = 0; i < meshes.size(); i++)
-	{
-		vector<Material> materials = meshes[i].materials;
-		for (unsigned int j = 0; j < materials.size(); j++)
+		for (unsigned int i = 0; i < meshes.size(); i++)
 		{
-			CreateDDSFile(materialsDir, materials[j].diffuseMap, createdFiles);
-			CreateDDSFile(materialsDir, materials[j].normalMap, createdFiles);
-			CreateDDSFile(materialsDir, materials[j].specularMap, createdFiles);
+			vector<Material> materials = meshes[i].materials;
+			for (unsigned int j = 0; j < materials.size(); j++)
+			{
+				CreateDDSFile(materialsDir, materials[j].diffuseMap, createdFiles);
+				CreateDDSFile(materialsDir, materials[j].normalMap, createdFiles);
+				CreateDDSFile(materialsDir, materials[j].specularMap, createdFiles);
+			}
 		}
 	}
+	else
+		cout << "Warning: Missing texconv.exe, textures will not be saved." << endl;
 
 	// Print material info
 	for (unsigned int i = 0; i < meshes.size(); i++)
@@ -423,11 +418,6 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 
 	// Add newly created texture to created files
 	createdFiles.push_back(outputFile);
-}
-
-int RoundToNearestPow2(int num)
-{
-	return (int)pow(2, ceil(log(num) / log(2)));
 }
 
 void EndApp(int success)
@@ -548,10 +538,4 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 		os << "\t" << "Tiling " << mat.uvScaling << endl;
 	if (!AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
 		os << "\t" << "Offset " << mat.uvTranslation << endl;
-}
-
-bool AlmostEqual(const FbxDouble2& d1, const FbxDouble2& d2)
-{
-	const FbxDouble epsilon = 0.0001;
-	return (fabs(d1[0] - d2[0]) < epsilon && fabs(d1[1] - d2[1]) < epsilon);
 }

@@ -22,6 +22,17 @@ struct Material
 	FbxDouble2 uvScaling;
 	FbxDouble2 uvTranslation;
 
+	static void LoadDefault(Material &mat)
+	{
+		FbxDouble diffuseValue = 150.0 / 255.0;
+		FbxDouble3 defaultDiffuse(diffuseValue, diffuseValue, diffuseValue);
+		mat.diffuseColor = defaultDiffuse;
+		mat.hasOpacity = false;
+		mat.hasSpecular = false;
+		mat.uvScaling = FbxDouble2(1, 1);
+		mat.uvTranslation = FbxDouble2(0, 0);
+	}
+
 	bool operator==(const Material &mat)
 	{
 		return (diffuseMap == mat.diffuseMap && diffuseColor == mat.diffuseColor &&
