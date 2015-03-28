@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "Common.h"
 #include "MeshImporter.h"
 
 MeshImporter::MeshImporter(const path &inputFile)
@@ -120,20 +121,15 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		if (meshIndex == 0)
 			centerPivotPoint = fbxMeshes[meshIndex]->LclTranslation.Get();
 
-		FbxVector4 meshOffset;
-		meshOffset[0] = centerPivotPoint[0] - meshPosition[0];
-		meshOffset[2] = centerPivotPoint[1] - meshPosition[1]; // The offset index is intentional to account for axis conversion
-		meshOffset[1] = centerPivotPoint[2] - meshPosition[2];
-
+		FbxVector4 positionOffset;
+		positionOffset[0] = centerPivotPoint[0] - meshPosition[0];
+		positionOffset[1] = centerPivotPoint[1] - meshPosition[1];
+		positionOffset[2] = centerPivotPoint[2] - meshPosition[2];
 		FbxVector4 rotationOffset = fbxMeshes[meshIndex]->LclRotation.Get();
-		rotationOffset[0] -= 90;
-		std::swap(rotationOffset[1], rotationOffset[2]);
 
 		// Transform matrices
-		FbxAMatrix offsetRotationMatrix(FbxVector4(0, 0, 0), FbxVector4(-90, 0, 180), FbxVector4(1, 1, 1));
-		meshOffset *= offsetRotationMatrix;
 		FbxAMatrix normalRotationMatrix(FbxVector4(0, 0, 0), rotationOffset, FbxVector4(1, 1, 1));
-		FbxAMatrix transformMatrix(meshOffset, rotationOffset, FbxVector4(1, 1, 1));
+		FbxAMatrix transformMatrix(positionOffset, rotationOffset, FbxVector4(1, 1, 1));
 
 		// Construct Unity engine style mesh
 		for (int vertexIndex = 0; vertexIndex < numVertices; vertexIndex++)
@@ -169,7 +165,7 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 				{
 					Vector2 uv;
 					uv.x = (float)fbxUvs[triangleIndices[0]][0];
-					uv.y = -(float)fbxUvs[triangleIndices[0]][1];
+					uv.y = (float)fbxUvs[triangleIndices[0]][1];
 					uvs.push_back(uv);
 				}
 
@@ -186,22 +182,6 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 		startTriangleIndex += fbxMesh->GetPolygonVertexCount();
 		delete[] vertexNormalGroups;
-	}
-
-	// Flip mesh x axis to work with unity's coordinate system
-	for (unsigned int i = 0; i < vertices.size(); i++)
-	{
-		vertices[i].x *= -1;
-	}
-	for (unsigned int i = 0; i < normals.size(); i++)
-	{
-		normals[i].x *= -1;
-	}
-	for (unsigned int i = 0; i < triangles.size(); i += 3) // Flip triangle winding
-	{
-		int tempIndex = triangles[i];
-		triangles[i] = triangles[i + 2];
-		triangles[i + 2] = tempIndex;
 	}
 
 	mesh.vertices = vertices;
@@ -324,6 +304,10 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 			vector<int> materialOffsets(currentMaterialIndices.size(), 0);
 			for (int materialIndex = 0; materialIndex < node->GetMaterialCount(); materialIndex++)
 			{
+				// Create material properties
+				Material materialProperties;
+				Material::LoadDefault(materialProperties); // Use default properties in case something goes wrong
+
 				FbxSurfaceMaterial *material = node->GetMaterial(materialIndex);
 				if (!material)
 				{
@@ -336,41 +320,41 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 					continue;
 
 				// Get material info
-				Material materialProperties;
 				materialProperties.diffuseMap = GetTexturePath(material, FbxSurfaceMaterial::sDiffuse);
 				materialProperties.normalMap = GetTexturePath(material, FbxSurfaceMaterial::sNormalMap);
+				materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
 				if (material->GetClassId().Is(FbxSurfacePhong::ClassId))
 				{
-					materialProperties.diffuseColor = ((FbxSurfacePhong*)material)->Diffuse;
+					FbxSurfacePhong *phong = (FbxSurfacePhong*)material;
 
-					FbxDouble opacityFactor = ((FbxSurfacePhong*)material)->TransparencyFactor;
-					materialProperties.hasOpacity = opacityFactor > 0;
-					if (materialProperties.hasOpacity)
-						materialProperties.opacity = opacityFactor;
+					materialProperties.diffuseColor = phong->Diffuse;
 
-					FbxDouble specularFactor = ((FbxSurfacePhong*)material)->SpecularFactor;
-					materialProperties.hasSpecular = specularFactor > 0;
-					if (materialProperties.hasSpecular)
+					FbxProperty property = phong->FindProperty("Opacity");
+					if (property.IsValid())
 					{
-						materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
-						materialProperties.specularColor = ((FbxSurfacePhong*)material)->Specular;
-						materialProperties.specularFactor = specularFactor;
+						FbxDouble opacity = property.Get<FbxDouble>();
+						materialProperties.hasOpacity = opacity < 1;
+						if (materialProperties.hasOpacity)
+							materialProperties.opacity = opacity;
 					}
 				}
 				else if (material->GetClassId().Is(FbxSurfaceLambert::ClassId))
 				{
-					materialProperties.diffuseColor = ((FbxSurfaceLambert*)material)->Diffuse;
+					FbxSurfaceLambert *lambert = (FbxSurfaceLambert*)material;
 
-					FbxDouble opacityFactor = ((FbxSurfaceLambert*)material)->TransparencyFactor;
-					materialProperties.hasOpacity = opacityFactor > 0;
-					if (materialProperties.hasOpacity)
-						materialProperties.opacity = opacityFactor;
+					materialProperties.diffuseColor = lambert->Diffuse;
+
+					FbxProperty property = lambert->FindProperty("Opacity");
+					if (property.IsValid())
+					{
+						FbxDouble opacity = property.Get<FbxDouble>();
+						materialProperties.hasOpacity = opacity < 1;
+						if (materialProperties.hasOpacity)
+							materialProperties.opacity = opacity;
+					}
 				}
 				else
-				{
-					Material::LoadDefault(materialProperties);
 					cout << "Warning: Unknown material type" << endl;
-				}
 
 				// Get uv info
 				FbxProperty property = material->FindProperty(FbxSurfaceMaterial::sDiffuse);

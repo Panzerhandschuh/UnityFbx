@@ -26,7 +26,6 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
 void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
 void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles);
-void EndApp(int success);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
 ostream& operator<<(ostream& os, const FbxDouble3 &d3);
 ofstream& operator<<(ofstream& os, const FbxDouble2 &d2);
@@ -57,13 +56,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		//	"\tEx: pwmimport \"C:\\FbxFiles\\Cube.fbx\" \"C:\\Protowave\\Models\\MyModel.pwm\"" << 
 		//	"\n\t\t\"C:\\Protowave\\Materials\\MyModel\"" << endl;
 		cout << "pwimport <fbx file> [options]\n" <<
-			"\t-outdir <directory>\tChange directory for converted file\n" <<
-			"\t-texdir <directory>\tChange directory for output textures\n" <<
-			"\t-collider\t\tExport as a collision model\n" <<
-			"\t-nonormals\t\tDo not import normals\n" <<
-			"\tEx: pwimport \"C:\\FbxFiles\\MyModel.fbx\" -outdir \"C:\\Protowave\\Models\"" <<
-			"\n\t\t-texdir \"C:\\Protowave\\Materials\\MyModel\"" << endl;
-		EndApp(EXIT_SUCCESS);
+			"\t-o <directory>\tChange directory for converted file\n" <<
+			"\t-t <directory>\tChange directory for output textures\n" <<
+			"\t-c\t\tExport as a collision model\n" <<
+			"\t-n\t\tDo not import normals\n" <<
+			"\tEx: pwimport \"C:\\FbxFiles\\MyModel.fbx\" -o \"C:\\Protowave\\Models\"" <<
+			"\n\t\t-t \"C:\\Protowave\\Materials\"" << endl;
+		exit(EXIT_SUCCESS);
 	}
 
 	// Input file
@@ -79,36 +78,36 @@ int _tmain(int argc, _TCHAR* argv[])
 	// Check optional arguments
 	for (int i = 2; i < argc; i++)
 	{
-		if (_tcscmp(argv[i], L"-outdir") == 0)
+		if (_tcscmp(argv[i], L"-o") == 0)
 		{
 			i++;
 			if (i < argc)
 				outputDir = argv[i];
 			else
 			{
-				cout << "Error: -outdir missing argument" << endl;
-				EndApp(EXIT_FAILURE);
+				cout << "Error: -o missing argument" << endl;
+				exit(EXIT_FAILURE);
 			}
 		}
-		else if (_tcscmp(argv[i], L"-texdir") == 0)
+		else if (_tcscmp(argv[i], L"-t") == 0)
 		{
 			i++;
 			if (i < argc)
 				texturesDir = argv[i];
 			else
 			{
-				cout << "Error: -texdir missing argument" << endl;
-				EndApp(EXIT_FAILURE);
+				cout << "Error: -t missing argument" << endl;
+				exit(EXIT_FAILURE);
 			}
 		}
-		else if (_tcscmp(argv[i], L"-collider") == 0)
+		else if (_tcscmp(argv[i], L"-c") == 0)
 			isCollider = true;
-		else if (_tcscmp(argv[i], L"-nonormals") == 0)
+		else if (_tcscmp(argv[i], L"-n") == 0)
 			importNormals = false;
 		else
 		{
 			cout << "Error: Invalid argument (" << argv[i] << ")" << endl;
-			EndApp(EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -129,7 +128,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	catch (exception &e)
 	{
 		cout << e.what() << endl;
-		EndApp(EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	if (!exists(inputFile))
@@ -145,7 +144,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 		// Import fbx
 		if (!importer.Import(meshes[0], !isCollider))
-			EndApp(EXIT_FAILURE);
+			exit(EXIT_FAILURE);
 
 		if (!isCollider) // Standard model
 		{
@@ -170,7 +169,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	EndApp(EXIT_SUCCESS);
+	exit(EXIT_SUCCESS);
 }
 
 
@@ -420,13 +419,6 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 	createdFiles.push_back(outputFile);
 }
 
-void EndApp(int success)
-{
-	cout << "Press enter to continue...";
-	cin.ignore();
-	exit(success);
-}
-
 ostream& operator<<(ostream& os, const FbxDouble2 &d2)
 {
 	os << d2[0] << " " << d2[1];
@@ -478,16 +470,9 @@ void PrintMaterial(const Material &mat)
 	if (!mat.normalMap.empty())
 		cout << "Normal Map: " << mat.normalMap.stem().string() << endl;
 
-	// Specular info
-	if (mat.hasSpecular)
-	{
-		if (!mat.specularMap.empty())
-			cout << "Specular Map: " << mat.specularMap.stem().string() << endl;
-		cout << "Specular Color: ";
-		PrintColor(mat.specularColor);
-		cout << endl;
-		cout << "Specular Factor: " << mat.specularFactor << endl;
-	}
+	// Specular map info
+	if (!mat.specularMap.empty())
+		cout << "Specular Map: " << mat.specularMap.stem().string() << endl;
 
 	// UV info
 	if (!AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
@@ -519,18 +504,11 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 		os << "\t" << "NormalMap " << pwmdlFileName << "\\" << textureName << endl;
 	}
 
-	// Specular info
-	if (mat.hasSpecular)
+	// Specular map info
+	if (!mat.specularMap.empty())
 	{
-		if (!mat.specularMap.empty())
-		{
-			string textureName = mat.specularMap.stem().string();
-			os << "\t" << "SpecularMap " << pwmdlFileName << "\\" << textureName << endl;
-		}
-		os << "\t" << "SpecularColor ";
-		WriteColor(os, mat.specularColor);
-		os << endl;
-		os << "\t" << "SpecularFactor " << mat.specularFactor << endl;
+		string textureName = mat.specularMap.stem().string();
+		os << "\t" << "SpecularMap " << pwmdlFileName << "\\" << textureName << endl;
 	}
 
 	// UV info
