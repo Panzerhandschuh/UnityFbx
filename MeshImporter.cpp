@@ -14,8 +14,6 @@ MeshImporter::MeshImporter(const path &inputFile)
 	if (!importer->Initialize(inputFile.string().c_str(), -1, manager->GetIOSettings()))
 	{
 		cout << "Failed to initialize fbx importer" << endl;
-		cout << "Press enter to continue...";
-		cin.ignore();
 		exit(EXIT_FAILURE);
 	}
 
@@ -24,11 +22,7 @@ MeshImporter::MeshImporter(const path &inputFile)
 	importer->Destroy();
 
 	if (!PrepareMeshes())
-	{
-		cout << "Press enter to continue...";
-		cin.ignore();
 		exit(EXIT_FAILURE);
-	}
 }
 
 MeshImporter::~MeshImporter()
@@ -245,19 +239,23 @@ bool MeshImporter::GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes)
 	}
 
 	for (int i = 0; i < rootNode->GetChildCount(); i++)
-	{
-		FbxNode *node = rootNode->GetChild(i);
-		if (node->GetNodeAttribute() == NULL)
-			continue;
-
-		FbxNodeAttribute::EType attribute = node->GetNodeAttribute()->GetAttributeType();
-		if (attribute != FbxNodeAttribute::eMesh)
-			continue;
-
-		fbxMeshes.Add(node);
-	}
+		GetMeshNodes(rootNode->GetChild(i), fbxMeshes);
 
 	return true;
+}
+
+void MeshImporter::GetMeshNodes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes)
+{
+	if (node->GetNodeAttribute() != NULL)
+	{
+		FbxNodeAttribute::EType attribute = node->GetNodeAttribute()->GetAttributeType();
+		if (attribute == FbxNodeAttribute::eMesh)
+			fbxMeshes.Add(node);
+	}
+	
+	// Get mesh nodes recursively
+	for (int i = 0; i < node->GetChildCount(); i++)
+		GetMeshNodes(node->GetChild(i), fbxMeshes);
 }
 
 void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
