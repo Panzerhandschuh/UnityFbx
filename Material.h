@@ -10,10 +10,10 @@ using namespace boost::filesystem;
 
 struct Material
 {
-	path diffuseMap;
-	FbxDouble3 diffuseColor;
+	FbxDouble3 color;
 	bool hasOpacity;
 	FbxDouble opacity;
+	path diffuseMap;
 	path normalMap;
 	path specularMap;
 	FbxDouble2 uvScaling;
@@ -21,9 +21,8 @@ struct Material
 
 	static void LoadDefault(Material &mat)
 	{
-		FbxDouble diffuseValue = 150.0 / 255.0;
-		FbxDouble3 defaultDiffuse(diffuseValue, diffuseValue, diffuseValue);
-		mat.diffuseColor = defaultDiffuse;
+		FbxDouble colorValue = 150.0 / 255.0;
+		mat.color = FbxDouble3(colorValue, colorValue, colorValue);
 		mat.hasOpacity = false;
 		mat.uvScaling = FbxDouble2(1, 1);
 		mat.uvTranslation = FbxDouble2(0, 0);
@@ -31,8 +30,8 @@ struct Material
 
 	bool operator==(const Material &mat)
 	{
-		return (diffuseMap == mat.diffuseMap && diffuseColor == mat.diffuseColor &&
-			hasOpacity == mat.hasOpacity && opacity == mat.opacity &&
+		return (color == mat.color && hasOpacity == mat.hasOpacity && 
+			opacity == mat.opacity && diffuseMap == mat.diffuseMap &&
 			normalMap == mat.normalMap && specularMap == mat.specularMap && 
 			uvScaling == mat.uvScaling && uvTranslation == mat.uvTranslation);
 	}

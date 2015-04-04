@@ -325,7 +325,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 				{
 					FbxSurfacePhong *phong = (FbxSurfacePhong*)material;
 
-					materialProperties.diffuseColor = phong->Diffuse;
+					materialProperties.color = phong->Diffuse;
 
 					FbxProperty property = phong->FindProperty("Opacity");
 					if (property.IsValid())
@@ -340,7 +340,7 @@ void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Materia
 				{
 					FbxSurfaceLambert *lambert = (FbxSurfaceLambert*)material;
 
-					materialProperties.diffuseColor = lambert->Diffuse;
+					materialProperties.color = lambert->Diffuse;
 
 					FbxProperty property = lambert->FindProperty("Opacity");
 					if (property.IsValid())

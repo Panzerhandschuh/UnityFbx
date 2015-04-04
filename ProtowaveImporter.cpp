@@ -316,11 +316,9 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
 		{
 			vector<Material> materials = meshes[i].materials;
-			file << "Material" << j << endl;
+			file << "Standard" << endl;
 			file << "{" << endl;
-
 			WriteMaterial(file, materials[j], pwmdlFileName);
-
 			file << "}";
 			if (j != materials.size() - 1) // Create line spacing if this is not the last material
 				file << endl << endl;
@@ -455,16 +453,16 @@ void WriteColor(ofstream& os, const FbxDouble3 &d3)
 
 void PrintMaterial(const Material &mat)
 {
-	// Diffuse info
-	if (!mat.diffuseMap.empty())
-		cout << "Diffuse Map: " << mat.diffuseMap.stem().string() << endl;
-	cout << "Diffuse Color: ";
-	PrintColor(mat.diffuseColor);
+	// Color/opacity info
+	cout << "Color: ";
+	PrintColor(mat.color);
 	cout << endl;
-
-	// Opacity info
 	if (mat.hasOpacity)
 		cout << "Opacity: " << mat.opacity << endl;
+
+	// Diffuse map info
+	if (!mat.diffuseMap.empty())
+		cout << "Diffuse Map: " << mat.diffuseMap.stem().string() << endl;
 
 	// Normal map info
 	if (!mat.normalMap.empty())
@@ -483,19 +481,19 @@ void PrintMaterial(const Material &mat)
 
 void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName)
 {
-	// Diffuse info
+	// Color/opacity info
+	os << "\t" << "Color ";
+	WriteColor(os, mat.color);
+	os << endl;
+	if (mat.hasOpacity)
+		os << "\t" << "Opacity " << mat.opacity << endl;
+
+	// Diffuse map info
 	if (!mat.diffuseMap.empty())
 	{
 		string textureName = mat.diffuseMap.stem().string();
 		os << "\t" << "DiffuseMap " << pwmdlFileName << "\\" << textureName << endl;
 	}
-	os << "\t" << "DiffuseColor ";
-	WriteColor(os, mat.diffuseColor);
-	os << endl;
-
-	// Opacity info
-	if (mat.hasOpacity)
-		os << "\t" << "Opacity " << mat.opacity << endl;
 
 	// Normal map info
 	if (!mat.normalMap.empty())
