@@ -3,11 +3,6 @@
 
 const FbxDouble EPSILON = 0.0001;
 
-int RoundToNearestPow2(int num)
-{
-	return (int)pow(2, ceil(log2((float)num)));
-}
-
 bool AlmostEqual(const FbxDouble& d1, const FbxDouble& d2)
 {
 	return fabs(d1 - d2) < EPSILON;

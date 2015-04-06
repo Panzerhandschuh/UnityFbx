@@ -392,23 +392,19 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 		texturePath = "";
 		return;
 	}
-	img.width = RoundToNearestPow2(img.width);
-	img.height = RoundToNearestPow2(img.height);
-	//int smaller = min(img.width, img.height);
-	//int numMipMaps = (log(smaller) / log(2)) + 1;
 
 	string format;
 	if (img.hasAlpha)
-		format = "DXT5";
+		format = "BC3_UNORM";
 	else
-		format = "DXT1";
+		format = "BC1_UNORM";
 	//cout << format << " " << img.width << " " << img.height << endl;
 
 	// Execute texture conversion
 	string imagePath = texturePath.string();
 	replace(imagePath.begin(), imagePath.end(), '/', '\\');
 	char command[512];
-	sprintf(command, "texconv -nologo -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
+	sprintf(command, "texconv -nologo -pow2 -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
 	//cout << command << endl;
 	system(command);
 	cout << endl;
