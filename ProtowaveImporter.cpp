@@ -316,7 +316,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
 		{
 			vector<Material> materials = meshes[i].materials;
-			file << "Standard" << endl;
+			file << "Material Standard" << endl;
 			file << "{" << endl;
 			WriteMaterial(file, materials[j], pwmdlFileName);
 			file << "}";
@@ -369,22 +369,8 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 
 	string fileName = texturePath.stem().string();
 	string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
-	if (boost::iequals(texturePath.extension().string(), ".dds")) // Copy the source file if it is already a .dds
-	{
-		try
-		{
-			copy_file(texturePath, outputFile, copy_option::overwrite_if_exists);
-			createdFiles.push_back(outputFile);
-		}
-		catch (exception &e)
-		{
-			cout << e.what() << endl;
-			texturePath = "";
-		}
-		return;
-	}
 
-	// Convert valid, non-dds image to dds
+	// Convert source image to dds
 	ImageInfo::ImageData img;
 	if (!ImageInfo::GetImageInfo(texturePath, img)) // Error retrieving image info
 	{
@@ -404,7 +390,7 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 	string imagePath = texturePath.string();
 	replace(imagePath.begin(), imagePath.end(), '/', '\\');
 	char command[512];
-	sprintf(command, "texconv -nologo -pow2 -w %d -h %d -f %s -o \"%s\" \"%s\"", img.width, img.height, format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
+	sprintf(command, "texconv -nologo -hflip -vflip -pow2 -f %s -o \"%s\" \"%s\"", format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
 	//cout << command << endl;
 	system(command);
 	cout << endl;
