@@ -5,7 +5,7 @@
 #include <vector>
 #include <string>
 #include <boost/filesystem/path.hpp>
-#include "Common.h"
+#include "MathUtil.h"
 #include "Mesh.h"
 #include "MeshImporter.h"
 #include "Serializer.h"
@@ -56,8 +56,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		//	"\tEx: pwmimport \"C:\\FbxFiles\\Cube.fbx\" \"C:\\Protowave\\Models\\MyModel.pwm\"" << 
 		//	"\n\t\t\"C:\\Protowave\\Materials\\MyModel\"" << endl;
 		cout << "pwimport <fbx file> [options]\n" <<
-			"\t-o <directory>\tChange directory for converted file\n" <<
-			"\t-t <directory>\tChange directory for output textures\n" <<
+			"\t-o <directory>\tChange directory for converted mesh, collision, and material files\n" <<
+			"\t-t <directory>\tChange directory for converted textures\n" <<
 			"\t-c\t\tExport as a collision model\n" <<
 			"\t-n\t\tDo not import normals\n" <<
 			"\tEx: pwimport \"C:\\FbxFiles\\MyModel.fbx\" -o \"C:\\Protowave\\Models\"" <<
@@ -66,14 +66,26 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// Input file
-	path inputFile(argv[1]);
+	path inputFile = (argv[1]);
+	if (!exists(inputFile))
+	{
+		cout << "Input file does not exist" << endl;
+		exit(EXIT_FAILURE);
+	}
+	else if (!boost::iequals(inputFile.extension().string(), ".fbx"))
+	{
+		cout << "Error: Input file must be a .fbx file" << endl;
+		exit(EXIT_FAILURE);
+	}
 
 	// Default values
 	bool importNormals = true;
 	bool isCollider = false;
 	//bool importMaterials = true;
 	path outputDir = inputFile.parent_path();
-	path texturesDir = outputDir.string() + "\\" + inputFile.stem().string();
+	if (outputDir.empty())
+		outputDir = ".";
+	path texturesDir = outputDir / inputFile.stem();
 
 	// Check optional arguments
 	for (int i = 2; i < argc; i++)
@@ -131,42 +143,39 @@ int _tmain(int argc, _TCHAR* argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (!exists(inputFile))
-		cout << "Input file does not exist" << endl;
-	else if (!boost::iequals(inputFile.extension().string(), ".fbx"))
-		cout << "Error: Input file must be a .fbx file" << endl;
-	else
+	// Initialize importer
+	MeshImporter importer(inputFile);
+
+	// Import fbx file
+	vector<Mesh> meshes;
+	Mesh mesh;
+	meshes.push_back(mesh);
+	if (!importer.Import(meshes[0], !isCollider))
+		exit(EXIT_FAILURE);
+
+	// Write the imported mesh info to files
+	if (!isCollider) // Standard model
 	{
-		vector<Mesh> meshes;
-		Mesh mesh;
-		meshes.push_back(mesh);
-		MeshImporter importer(inputFile);
+		// Create files
+		vector<string> createdFiles;
+		CreateDDSFiles(texturesDir, meshes, createdFiles);
+		path pwmdlFile(inputFile.stem().string() + ".pwmdl");
+		path outputPath(outputDir / pwmdlFile);
+		WriteMaterialsToFile(outputPath, texturesDir, meshes);
+		WriteMeshesToFile(outputPath, meshes, importNormals);
 
-		// Import fbx
-		if (!importer.Import(meshes[0], !isCollider))
-			exit(EXIT_FAILURE);
+		// Print created file info to console
+		PrintCreatedFiles(outputPath, createdFiles, true);
+	}
+	else // Collider mesh
+	{
+		// Create files
+		path pwcolFile(inputFile.stem().string() + ".pwcol");
+		path outputPath(outputDir / pwcolFile);
+		WriteCollidersToFile(outputPath, meshes, importNormals);
 
-		if (!isCollider) // Standard model
-		{
-			// Create files
-			vector<string> createdFiles;
-			CreateDDSFiles(texturesDir, meshes, createdFiles);
-			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwmdl");
-			WriteMaterialsToFile(outputFile, texturesDir, meshes);
-			WriteMeshesToFile(outputFile, meshes, importNormals);
-
-			// Print created file info to console
-			PrintCreatedFiles(outputFile, createdFiles, true);
-		}
-		else // Collider mesh
-		{
-			// Create files
-			path outputFile(outputDir.string() + "\\" + inputFile.stem().string() + ".pwcol");
-			WriteCollidersToFile(outputFile, meshes, importNormals);
-
-			// Print created file info to console
-			PrintCreatedFiles(outputFile, vector<string>(0), false);
-		}
+		// Print created file info to console
+		PrintCreatedFiles(outputPath, vector<string>(0), false);
 	}
 
 	exit(EXIT_SUCCESS);
@@ -180,8 +189,9 @@ void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFile
 
 	if (importMaterials)
 	{
-		string pwmatFile = outputFile.parent_path().string() + "\\" + outputFile.stem().string() + ".pwmat";
-		cout << pwmatFile << endl;
+		path pwmatFile(outputFile.stem().string() + ".pwmat");
+		path outputPath = outputFile.parent_path() / pwmatFile;
+		cout << outputPath.string() << endl;
 		for (unsigned int i = 0; i < createdFiles.size(); i++)
 			cout << createdFiles[i] << endl;
 	}
@@ -242,7 +252,7 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 			Serializer::Serialize(file, mesh.materialIds[j]);
 
 		// Print mesh info
-		cout << "Mesh " << i + 1 << ":" << endl;
+		cout << "Mesh " << i << ":" << endl;
 		cout << "Vertex Count: " << numVertices << endl;
 		cout << "Triangle Index Count: " << numTriangles << endl;
 		cout << "Normal Count: " << numNormals << endl;
@@ -306,10 +316,11 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes)
 {
-	string pwmatFile = outputFile.parent_path().string() + "\\" + outputFile.stem().string() + ".pwmat";
+	path pwmatFile(outputFile.stem().string() + ".pwmat");
+	path outputPath = outputFile.parent_path() / pwmatFile;
 	string pwmdlFileName = outputFile.stem().string();
 	ofstream file;
-	file.open(pwmatFile);
+	file.open(outputPath.string());
 
 	for (unsigned int i = 0; i < meshes.size(); i++)
 	{
@@ -329,7 +340,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 
 void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
 {
-	string texconvPath = initial_path().string() + "\\texconv.exe";
+	path texconvPath(initial_path() / "texconv.exe");
 	if (exists(texconvPath))
 	{
 		for (unsigned int i = 0; i < meshes.size(); i++)
@@ -340,23 +351,16 @@ void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<strin
 				CreateDDSFile(materialsDir, materials[j].diffuseMap, createdFiles);
 				CreateDDSFile(materialsDir, materials[j].normalMap, createdFiles);
 				CreateDDSFile(materialsDir, materials[j].specularMap, createdFiles);
+
+				// Print material info
+				cout << "Material " << j << ":" << endl;
+				PrintMaterial(materials[j]);
+				cout << endl;
 			}
 		}
 	}
 	else
 		cout << "Warning: Missing texconv.exe, textures will not be saved." << endl;
-
-	// Print material info
-	for (unsigned int i = 0; i < meshes.size(); i++)
-	{
-		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
-		{
-			vector<Material> materials = meshes[i].materials;
-			cout << "Material " << j << ":" << endl;
-			PrintMaterial(materials[j]);
-			cout << endl;
-		}
-	}
 }
 
 void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles)
@@ -367,8 +371,8 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 		return;
 	}
 
-	string fileName = texturePath.stem().string();
-	string outputFile = materialsDir.string() + "\\" + fileName + ".dds";
+	path ddsFile(texturePath.stem().string() + ".dds");
+	path outputPath(materialsDir / ddsFile);
 
 	// Convert source image to dds
 	ImageInfo::ImageData img;
@@ -396,7 +400,7 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 	cout << endl;
 
 	// Add newly created texture to created files
-	createdFiles.push_back(outputFile);
+	createdFiles.push_back(outputPath.string());
 }
 
 ostream& operator<<(ostream& os, const FbxDouble2 &d2)

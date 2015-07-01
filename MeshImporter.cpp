@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Common.h"
+#include "MathUtil.h"
 #include "MeshImporter.h"
 
 MeshImporter::MeshImporter(const path &inputFile)

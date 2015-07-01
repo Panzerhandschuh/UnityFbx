@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Common.h"
+#include "MathUtil.h"
 
 const FbxDouble EPSILON = 0.0001;
 

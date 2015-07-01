@@ -1,5 +1,5 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef MATHUTIL_H
+#define MATHUTIL_H
 
 #include <fbxsdk.h>
 
