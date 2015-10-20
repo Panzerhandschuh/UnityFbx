@@ -178,6 +178,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		PrintCreatedFiles(outputPath, vector<string>(0), false);
 	}
 
+	// Remove import textures
+	path fbmDir(inputFile.stem().string() + ".fbm");
+	path fbmPath(outputDir / fbmDir);
+	if (exists(fbmPath))
+		remove_all(fbmPath);
+
 	exit(EXIT_SUCCESS);
 }
 
