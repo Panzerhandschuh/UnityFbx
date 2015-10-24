@@ -86,6 +86,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="FbxUtil.h" />
     <ClInclude Include="MathUtil.h" />
     <ClInclude Include="ImageInfo.h" />
     <ClInclude Include="Material.h" />
@@ -96,6 +97,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="FbxUtil.cpp" />
     <ClCompile Include="MathUtil.cpp" />
     <ClCompile Include="ImageInfo.cpp" />
     <ClCompile Include="MeshImporter.cpp" />

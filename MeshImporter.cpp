@@ -50,7 +50,7 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 	vector<Vector2> uvs;
 	int currentVertexIndex = 0;
 	int startTriangleIndex = 0;
-	FbxDouble3 centerPivotPoint;
+	FbxVector4 centerPivotPoint;
 
 	// Loop through triangle indices to find unique vertex normals
 	// If a unique vertex normal exists, duplicate the vertex
@@ -111,19 +111,22 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		}
 
 		// Mesh position offset info
-		FbxDouble3 meshPosition = fbxMeshes[meshIndex]->LclTranslation.Get();
+		//FbxVector4 lclTranslation = fbxMeshes[meshIndex]->LclTranslation.Get();
+		//FbxVector4 lclRotation = fbxMeshes[meshIndex]->LclRotation.Get();
+		//FbxVector4 lclScaling = fbxMeshes[meshIndex]->LclScaling.Get();
+		//FbxAMatrix lclTransform(lclTranslation, lclRotation, lclScaling);
+		FbxAMatrix lclTransform = fbxMeshes[meshIndex]->EvaluateLocalTransform();
+		FbxVector4 lclTranslation = lclTransform.GetT();
+
 		if (meshIndex == 0)
-			centerPivotPoint = fbxMeshes[meshIndex]->LclTranslation.Get();
+			centerPivotPoint = lclTranslation;
+		FbxVector4 positionOffset = lclTranslation - centerPivotPoint;
+		lclTransform.SetT(positionOffset);
 
-		FbxVector4 positionOffset;
-		positionOffset[0] = centerPivotPoint[0] - meshPosition[0];
-		positionOffset[1] = centerPivotPoint[1] - meshPosition[1];
-		positionOffset[2] = centerPivotPoint[2] - meshPosition[2];
-		FbxVector4 rotationOffset = fbxMeshes[meshIndex]->LclRotation.Get();
-
-		// Transform matrices
-		FbxAMatrix normalRotationMatrix(FbxVector4(0, 0, 0), rotationOffset, FbxVector4(1, 1, 1));
-		FbxAMatrix transformMatrix(positionOffset, rotationOffset, FbxVector4(1, 1, 1));
+		// Get transform matrices
+		FbxAMatrix geometry = FbxUtil::GetGeometry(fbxMeshes[meshIndex]);
+		FbxAMatrix transform = lclTransform * geometry;
+		FbxAMatrix invTrans = transform.Inverse().Transpose();
 
 		// Construct Unity engine style mesh
 		for (int vertexIndex = 0; vertexIndex < numVertices; vertexIndex++)
@@ -134,8 +137,7 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 			{
 				// Add vertex info to unity mesh
 				Vector3 vertex;
-				fbxVertices[vertexIndex][3] = 1;
-				FbxVector4 transformedVertex = fbxVertices[vertexIndex] * transformMatrix;
+				FbxVector4 transformedVertex = transform.MultT(fbxVertices[vertexIndex]);
 				vertex.x = (float)transformedVertex[0];
 				vertex.y = (float)transformedVertex[1];
 				vertex.z = (float)transformedVertex[2];
@@ -147,8 +149,8 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 				// Add normal info to unity mesh
 				Vector3 normal;
-				fbxNormals[triangleIndices[0]][3] = 1;
-				FbxVector4 transformedNormal = fbxNormals[triangleIndices[0]] * normalRotationMatrix;
+				FbxVector4 transformedNormal = invTrans.MultT(fbxNormals[triangleIndices[0]]);
+				transformedNormal.Normalize();
 				normal.x = (float)transformedNormal[0];
 				normal.y = (float)transformedNormal[1];
 				normal.z = (float)transformedNormal[2];

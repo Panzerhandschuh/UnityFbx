@@ -6,6 +6,7 @@
 #include <vector>
 #include <boost/filesystem.hpp>
 #include "Mesh.h"
+#include "FbxUtil.h"
 
 using namespace std;
 using namespace boost::filesystem;
