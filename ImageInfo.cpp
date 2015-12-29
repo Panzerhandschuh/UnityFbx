@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include "ImageInfo.h"
 
+using namespace std;
+using namespace boost::filesystem;
+
 bool ImageInfo::GetImageInfo(const path &imagePath, ImageData &img)
 {
 	if (!IsValidImage(imagePath))

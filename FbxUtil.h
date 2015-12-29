@@ -3,8 +3,6 @@
 
 #include <fbxsdk.h>
 
-using namespace fbxsdk_2015_1;
-
 class FbxUtil
 {
 public:

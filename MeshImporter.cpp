@@ -2,6 +2,10 @@
 #include "MathUtil.h"
 #include "MeshImporter.h"
 
+using namespace std;
+using namespace boost::filesystem;
+using namespace fbxsdk_2015_1;
+
 MeshImporter::MeshImporter(const path &inputFile)
 {
 	fbxFile = inputFile;

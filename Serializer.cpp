@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Serializer.h"
 
+using namespace std;
+
 void Serializer::SerializeMagicNumber(ofstream &file, const char *text)
 {
 	file.write(text, strlen(text));

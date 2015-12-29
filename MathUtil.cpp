@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "MathUtil.h"
 
+using namespace fbxsdk_2015_1;
+
 const FbxDouble EPSILON = 0.0001;
 
 bool AlmostEqual(const FbxDouble& d1, const FbxDouble& d2)

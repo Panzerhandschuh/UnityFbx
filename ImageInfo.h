@@ -6,9 +6,6 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <iostream>
 
-using namespace std;
-using namespace boost::filesystem;
-
 class ImageInfo
 {
 public:
@@ -18,8 +15,8 @@ public:
 		int height;
 		bool hasAlpha;
 	};
-	static bool GetImageInfo(const path &imgPath, ImageData &img);
-	static bool IsValidImage(const path &imgPath);
+	static bool GetImageInfo(const boost::filesystem::path &imgPath, ImageData &img);
+	static bool IsValidImage(const boost::filesystem::path &imgPath);
 private:
 	static bool GetBmpInfo(FILE *file, ImageData &img);
 	static bool GetDdsInfo(FILE *file, ImageData &img);

@@ -8,10 +8,6 @@
 #include "Mesh.h"
 #include "FbxUtil.h"
 
-using namespace std;
-using namespace boost::filesystem;
-using namespace fbxsdk_2015_1;
-
 class MeshImporter
 {
 public:

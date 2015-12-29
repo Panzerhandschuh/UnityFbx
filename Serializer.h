@@ -4,8 +4,6 @@
 #include <fstream>
 #include "Mesh.h"
 
-using namespace std;
-
 class Serializer
 {
 public:
