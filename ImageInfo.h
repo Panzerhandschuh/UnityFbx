@@ -2,27 +2,23 @@
 #define IMAGEINFO_H
 
 #include <string>
+#include <exception>
 #include <boost/filesystem/path.hpp>
 #include <boost/algorithm/string/predicate.hpp>
-#include <iostream>
 
 class ImageInfo
 {
 public:
-	struct ImageData
-	{
-		int width;
-		int height;
-		bool hasAlpha;
-	};
-	static bool GetImageInfo(const boost::filesystem::path &imgPath, ImageData &img);
-	static bool IsValidImage(const boost::filesystem::path &imgPath);
+	int width, height;
+	bool hasAlpha;
+
+	ImageInfo(const boost::filesystem::path &imgPath);
 private:
-	static bool GetBmpInfo(FILE *file, ImageData &img);
-	static bool GetDdsInfo(FILE *file, ImageData &img);
-	static bool GetJpgInfo(FILE *file, ImageData &img);
-	static bool GetPngInfo(FILE *file, ImageData &img);
-	static bool GetTgaInfo(FILE *file, ImageData &img);
+	bool GetBmpInfo(FILE *file);
+	bool GetDdsInfo(FILE *file);
+	bool GetJpgInfo(FILE *file);
+	bool GetPngInfo(FILE *file);
+	bool GetTgaInfo(FILE *file);
 };
 
 #endif

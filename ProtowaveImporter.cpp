@@ -4,11 +4,12 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <exception>
 #include <boost/filesystem/path.hpp>
 #include "MathUtil.h"
 #include "Mesh.h"
 #include "MeshImporter.h"
-#include "Serializer.h"
+#include "BinaryWriter.h"
 #include "ImageInfo.h"
 
 using namespace std;
@@ -205,118 +206,120 @@ void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFile
 
 void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals)
 {
-	ofstream file;
-	file.open(outputFile.string(), ios::out | ios::binary | ios::trunc);
-	if (!file)
+	try
 	{
-		cout << "Error: Could not open output file. Another process may be using it." << endl;
-		return;
+		BinaryWriter writer(outputFile.string());
+
+		// Header
+		writer.Write(PWMDL_NAME);
+		writer.Write(PWMDL_VERSION);
+
+		// Meshes
+		int numMeshes = meshes.size();
+		writer.Write(numMeshes);
+
+		for (int i = 0; i < numMeshes; i++)
+		{
+			Mesh mesh = meshes[i];
+
+			// Vertices
+			int numVertices = mesh.vertices.size();
+			writer.Write(numVertices);
+			for (int j = 0; j < numVertices; j++)
+				writer.Write(mesh.vertices[j]);
+
+			// Triangles
+			int numTriangles = mesh.triangles.size();
+			writer.Write(numTriangles);
+			for (int j = 0; j < numTriangles; j++)
+				writer.Write(mesh.triangles[j]);
+
+			// Normals
+			int numNormals = 0;
+			if (importNormals)
+				numNormals = mesh.normals.size();
+			writer.Write(numNormals);
+			for (int j = 0; j < numNormals; j++)
+				writer.Write(mesh.normals[j]);
+
+			// Uvs
+			int numUvs = mesh.uvs.size();
+			writer.Write(numUvs);
+			for (int j = 0; j < numUvs; j++)
+				writer.Write(mesh.uvs[j]);
+
+			// Material ids
+			int numMaterialIds = mesh.materialIds.size();
+			writer.Write(numMaterialIds);
+			for (int j = 0; j < numMaterialIds; j++)
+				writer.Write(mesh.materialIds[j]);
+
+			// Print mesh info
+			cout << "Mesh " << i << ":" << endl;
+			cout << "Vertex Count: " << numVertices << endl;
+			cout << "Triangle Index Count: " << numTriangles << endl;
+			cout << "Normal Count: " << numNormals << endl;
+			cout << "Uv Count: " << numUvs << endl;
+			cout << "Material Id Count: " << numMaterialIds << endl;
+			cout << "Material Count: " << mesh.materials.size() << endl;
+			cout << endl;
+		}
 	}
-
-	// Header
-	Serializer::SerializeMagicNumber(file, PWMDL_NAME);
-	Serializer::Serialize(file, PWMDL_VERSION);
-
-	// Meshes
-	int numMeshes = meshes.size();
-	Serializer::Serialize(file, numMeshes);
-
-	for (int i = 0; i < numMeshes; i++)
+	catch (exception &e)
 	{
-		Mesh mesh = meshes[i];
-
-		// Vertices
-		int numVertices = mesh.vertices.size();
-		Serializer::Serialize(file, numVertices);
-		for (int j = 0; j < numVertices; j++)
-			Serializer::Serialize(file, mesh.vertices[j]);
-
-		// Triangles
-		int numTriangles = mesh.triangles.size();
-		Serializer::Serialize(file, numTriangles);
-		for (int j = 0; j < numTriangles; j++)
-			Serializer::Serialize(file, mesh.triangles[j]);
-
-		// Normals
-		int numNormals = 0;
-		if (importNormals)
-			numNormals = mesh.normals.size();
-		Serializer::Serialize(file, numNormals);
-		for (int j = 0; j < numNormals; j++)
-			Serializer::Serialize(file, mesh.normals[j]);
-
-		// Uvs
-		int numUvs = mesh.uvs.size();
-		Serializer::Serialize(file, numUvs);
-		for (int j = 0; j < numUvs; j++)
-			Serializer::Serialize(file, mesh.uvs[j]);
-
-		// Material ids
-		int numMaterialIds = mesh.materialIds.size();
-		Serializer::Serialize(file, numMaterialIds);
-		for (int j = 0; j < numMaterialIds; j++)
-			Serializer::Serialize(file, mesh.materialIds[j]);
-
-		// Print mesh info
-		cout << "Mesh " << i << ":" << endl;
-		cout << "Vertex Count: " << numVertices << endl;
-		cout << "Triangle Index Count: " << numTriangles << endl;
-		cout << "Normal Count: " << numNormals << endl;
-		cout << "Uv Count: " << numUvs << endl;
-		cout << "Material Id Count: " << numMaterialIds << endl;
-		cout << "Material Count: " << mesh.materials.size() << endl;
-		cout << endl;
+		cerr << e.what() << endl;
 	}
 }
 
 void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals)
 {
-	ofstream file;
-	file.open(outputFile.string(), ios::out | ios::binary | ios::trunc);
-	if (!file)
+	try
 	{
-		cout << "Error: Could not open output file. Another process may be using it." << endl;
-		return;
+		BinaryWriter writer(outputFile.string());
+
+		// Header
+		writer.Write(PWCOL_NAME);
+		writer.Write(PWCOL_VERSION);
+
+		// Meshes
+		int numMeshes = meshes.size();
+		writer.Write(numMeshes);
+
+		for (int i = 0; i < numMeshes; i++)
+		{
+			Mesh mesh = meshes[i];
+
+			// Vertices
+			int numVertices = mesh.vertices.size();
+			writer.Write(numVertices);
+			for (int j = 0; j < numVertices; j++)
+				writer.Write(mesh.vertices[j]);
+
+			// Triangles
+			int numTriangles = mesh.triangles.size();
+			writer.Write(numTriangles);
+			for (int j = 0; j < numTriangles; j++)
+				writer.Write(mesh.triangles[j]);
+
+			// Normals
+			int numNormals = 0;
+			if (importNormals)
+				numNormals = mesh.normals.size();
+			writer.Write(numNormals);
+			for (int j = 0; j < numNormals; j++)
+				writer.Write(mesh.normals[j]);
+
+			// Print mesh info
+			cout << "Mesh " << i + 1 << ":" << endl;
+			cout << "Vertex Count: " << numVertices << endl;
+			cout << "Triangle Index Count: " << numTriangles << endl;
+			cout << "Normal Count: " << numNormals << endl;
+			cout << endl;
+		}
 	}
-
-	// Header
-	Serializer::SerializeMagicNumber(file, PWCOL_NAME);
-	Serializer::Serialize(file, PWCOL_VERSION);
-
-	// Meshes
-	int numMeshes = meshes.size();
-	Serializer::Serialize(file, numMeshes);
-
-	for (int i = 0; i < numMeshes; i++)
+	catch (exception &e)
 	{
-		Mesh mesh = meshes[i];
-
-		// Vertices
-		int numVertices = mesh.vertices.size();
-		Serializer::Serialize(file, numVertices);
-		for (int j = 0; j < numVertices; j++)
-			Serializer::Serialize(file, mesh.vertices[j]);
-
-		// Triangles
-		int numTriangles = mesh.triangles.size();
-		Serializer::Serialize(file, numTriangles);
-		for (int j = 0; j < numTriangles; j++)
-			Serializer::Serialize(file, mesh.triangles[j]);
-
-		// Normals
-		int numNormals = 0;
-		if (importNormals)
-			numNormals = mesh.normals.size();
-		Serializer::Serialize(file, numNormals);
-		for (int j = 0; j < numNormals; j++)
-			Serializer::Serialize(file, mesh.normals[j]);
-
-		// Print mesh info
-		cout << "Mesh " << i + 1 << ":" << endl;
-		cout << "Vertex Count: " << numVertices << endl;
-		cout << "Triangle Index Count: " << numTriangles << endl;
-		cout << "Normal Count: " << numNormals << endl;
-		cout << endl;
+		cerr << e.what() << endl;
 	}
 }
 
@@ -371,42 +374,44 @@ void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<strin
 
 void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles)
 {
-	if (!ImageInfo::IsValidImage(texturePath)) // The image is not valid
+	if (texturePath.empty()) // Skip empty textures
 	{
 		texturePath = "";
 		return;
 	}
 
-	path ddsFile(texturePath.stem().string() + ".dds");
-	path outputPath(materialsDir / ddsFile);
-
-	// Convert source image to dds
-	ImageInfo::ImageData img;
-	if (!ImageInfo::GetImageInfo(texturePath, img)) // Error retrieving image info
+	try
 	{
-		cout << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
-		texturePath = "";
-		return;
+		ImageInfo imgInfo(texturePath);
+
+		path ddsFile(texturePath.stem().string() + ".dds");
+		path outputPath(materialsDir / ddsFile);
+
+		string format;
+		if (imgInfo.hasAlpha)
+			format = "BC3_UNORM";
+		else
+			format = "BC1_UNORM";
+		//cout << format << " " << img.width << " " << img.height << endl;
+
+		// Execute texture conversion
+		string imagePath = texturePath.string();
+		replace(imagePath.begin(), imagePath.end(), '/', '\\');
+		char command[512];
+		sprintf(command, "texconv -nologo -hflip -vflip -pow2 -f %s -o \"%s\" \"%s\"", format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
+		//cout << command << endl;
+		system(command);
+		cout << endl;
+
+		// Add newly created texture to created files
+		createdFiles.push_back(outputPath.string());
 	}
-
-	string format;
-	if (img.hasAlpha)
-		format = "BC3_UNORM";
-	else
-		format = "BC1_UNORM";
-	//cout << format << " " << img.width << " " << img.height << endl;
-
-	// Execute texture conversion
-	string imagePath = texturePath.string();
-	replace(imagePath.begin(), imagePath.end(), '/', '\\');
-	char command[512];
-	sprintf(command, "texconv -nologo -hflip -vflip -pow2 -f %s -o \"%s\" \"%s\"", format.c_str(), materialsDir.string().c_str(), imagePath.c_str());
-	//cout << command << endl;
-	system(command);
-	cout << endl;
-
-	// Add newly created texture to created files
-	createdFiles.push_back(outputPath.string());
+	catch (exception &e)
+	{
+		cerr << e.what() << endl;
+		cerr << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
+		texturePath = "";
+	}
 }
 
 ostream& operator<<(ostream& os, const FbxDouble2 &d2)

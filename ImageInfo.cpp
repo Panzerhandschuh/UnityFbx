@@ -1,52 +1,41 @@
 #include "stdafx.h"
 #include "ImageInfo.h"
+#include <iostream>
 
 using namespace std;
 using namespace boost::filesystem;
 
-bool ImageInfo::GetImageInfo(const path &imagePath, ImageData &img)
+ImageInfo::ImageInfo(const path &imagePath)
 {
-	if (!IsValidImage(imagePath))
-		return false;
-
 	string extension = imagePath.extension().string();
+	string validExtensions[] = { ".bmp", ".dds", ".jpg", ".png", ".tga" };
+	if (find(begin(validExtensions), end(validExtensions), extension) == end(validExtensions)) // Check if the extension is valid
+		throw runtime_error("Invalid image format (" + extension + ")");
+
 	FILE* file;
 	file = fopen(imagePath.string().c_str(), "rb");
+	if (!file)
+		throw runtime_error("Failed to open file (" + imagePath.string() + ")");
 
 	bool success = false;
 	if (boost::iequals(extension, ".bmp"))
-		success = GetBmpInfo(file, img);
+		success = GetBmpInfo(file);
 	else if (boost::iequals(extension, ".dds"))
-		success = GetDdsInfo(file, img);
+		success = GetDdsInfo(file);
 	else if (boost::iequals(extension, ".jpg"))
-		success = GetJpgInfo(file, img);
+		success = GetJpgInfo(file);
 	else if (boost::iequals(extension, ".png"))
-		success = GetPngInfo(file, img);
+		success = GetPngInfo(file);
 	else if (boost::iequals(extension, ".tga"))
-		success = GetTgaInfo(file, img);
+		success = GetTgaInfo(file);
 
 	fclose(file);
 
-	return success;
+	if (!success)
+		throw runtime_error("Failed to get image info (" + imagePath.string() + ")");
 }
 
-bool ImageInfo::IsValidImage(const path &imagePath)
-{
-	if (imagePath.empty())
-		return false;
-	string extension = imagePath.extension().string();
-	if (boost::iequals(extension, ".bmp") || boost::iequals(extension, ".dds") ||
-		boost::iequals(extension, ".jpg") || boost::iequals(extension, ".png") ||
-		boost::iequals(extension, ".tga"))
-		return true;
-	else
-	{
-		cout << "Unsupported image format detected (" << extension << ")" << endl;
-		return false;
-	}
-}
-
-bool ImageInfo::GetBmpInfo(FILE *file, ImageData &img)
+bool ImageInfo::GetBmpInfo(FILE *file)
 {
 	unsigned short fileType;
 	fread(&fileType, 2, 1, file);
@@ -55,23 +44,19 @@ bool ImageInfo::GetBmpInfo(FILE *file, ImageData &img)
 
 	// Get dimensions
 	fseek(file, 16, SEEK_CUR); // Seek to width info
-	fread(&img.width, 4, 1, file);
-	fread(&img.height, 4, 1, file);
+	fread(&width, 4, 1, file);
+	fread(&height, 4, 1, file);
 
 	// Get bit count
 	unsigned short bitCount;
 	fseek(file, 2, SEEK_CUR); // Seek to bit count
 	fread(&bitCount, 2, 1, file);
-	if (bitCount == 32)
-		img.hasAlpha = true;
-	else
-		img.hasAlpha = false;
-	//cout << "Bit Count: " << bitCount << endl;
+	hasAlpha = (bitCount == 32);
 
 	return true;
 }
 
-bool ImageInfo::GetDdsInfo(FILE *file, ImageData &img)
+bool ImageInfo::GetDdsInfo(FILE *file)
 {
 	char magicNumber[4];
 	fread(magicNumber, 1, 4, file);
@@ -80,8 +65,8 @@ bool ImageInfo::GetDdsInfo(FILE *file, ImageData &img)
 
 	// Get dimensions
 	fseek(file, 8, SEEK_CUR); // Seek to width
-	fread(&img.width, 4, 1, file);
-	fread(&img.height, 4, 1, file);
+	fread(&width, 4, 1, file);
+	fread(&height, 4, 1, file);
 
 	fseek(file, 64, SEEK_CUR); // Seek to pixel format
 	unsigned char code[4];
@@ -89,9 +74,9 @@ bool ImageInfo::GetDdsInfo(FILE *file, ImageData &img)
 	if (code[0] == 'D' && code[1] == 'X' && code[2] == 'T')
 	{
 		if (code[3] == '1')
-			img.hasAlpha = false;
+			hasAlpha = false;
 		else if (code[3] == '5')
-			img.hasAlpha = true;
+			hasAlpha = true;
 		else
 			return false;
 	}
@@ -108,9 +93,9 @@ bool ImageInfo::GetDdsInfo(FILE *file, ImageData &img)
 	(a) = (cc_ << 8) + (dd_); \
 	} while (0)
 
-bool ImageInfo::GetJpgInfo(FILE *file, ImageData &img)
+bool ImageInfo::GetJpgInfo(FILE *file)
 {
-	img.hasAlpha = false;
+	hasAlpha = false;
 
 	int marker = 0;
 	int dummy = 0;
@@ -149,8 +134,8 @@ bool ImageInfo::GetJpgInfo(FILE *file, ImageData &img)
 			{
 				readword(dummy, file); // Usual parameter length count
 				readbyte(dummy, file);
-				readword((img.height), file);
-				readword((img.width), file);
+				readword(height, file);
+				readword(width, file);
 				readbyte(dummy, file);
 
 				return true;
@@ -179,7 +164,7 @@ bool ImageInfo::GetJpgInfo(FILE *file, ImageData &img)
 	return false;
 }
 
-bool ImageInfo::GetPngInfo(FILE *file, ImageData &img)
+bool ImageInfo::GetPngInfo(FILE *file)
 {
 	unsigned char header[8];
 	fread(header, 1, 8, file);
@@ -187,10 +172,7 @@ bool ImageInfo::GetPngInfo(FILE *file, ImageData &img)
 	// Verify header
 	if (header[0] != 0x89 || header[1] != 0x50 || header[2] != 0x4E || header[3] != 0x47 ||
 		header[4] != 0x0D || header[5] != 0x0A || header[6] != 0x1A || header[7] != 0x0A)
-	{
-		cout << "asdf";
 		return false;
-	}
 
 	// Width and height will have a reversed byte ordering
 	fseek(file, 8, SEEK_CUR); // Seek to width
@@ -198,39 +180,32 @@ bool ImageInfo::GetPngInfo(FILE *file, ImageData &img)
 	fread(&rWidth, 4, 1, file);
 	fread(&rHeight, 4, 1, file);
 
-	img.width = _byteswap_ulong(rWidth);
-	img.height = _byteswap_ulong(rHeight);
+	width = _byteswap_ulong(rWidth);
+	height = _byteswap_ulong(rHeight);
 
 	// Get color type
 	fseek(file, 1, SEEK_CUR); // Seek to color type
 	unsigned char colorType;
 	fread(&colorType, 1, 1, file);
-	if (colorType == 4 || colorType == 6)
-		img.hasAlpha = true;
-	else
-		img.hasAlpha = false;
+	hasAlpha = (colorType == 4 || colorType == 6);
 
 	return true;
 }
 
-bool ImageInfo::GetTgaInfo(FILE *file, ImageData &img)
+bool ImageInfo::GetTgaInfo(FILE *file)
 {
 	// Get dimensions
 	fseek(file, 12, SEEK_SET); // Seek to width
 	short sWidth, sHeight;
 	fread(&sWidth, 2, 1, file);
 	fread(&sHeight, 2, 1, file);
-	img.width = (int)sWidth;
-	img.height = (int)sHeight;
+	width = (int)sWidth;
+	height = (int)sHeight;
 
 	// Get bit depth
 	unsigned char depth;
 	fread(&depth, 1, 1, file);
-	//cout << (int)depth << " " << img.width << " " << img.height << endl;
-	if (depth == 32)
-		img.hasAlpha = true;
-	else
-		img.hasAlpha = false;
+	hasAlpha = (depth == 32);
 
 	return true;
 }

@@ -36,13 +36,13 @@
     <ClInclude Include="MeshImporter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Serializer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MathUtil.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="FbxUtil.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BinaryWriter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -59,13 +59,13 @@
     <ClCompile Include="MeshImporter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Serializer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MathUtil.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FbxUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="BinaryWriter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
