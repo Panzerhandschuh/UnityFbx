@@ -470,9 +470,9 @@ void PrintMaterial(const Material &mat)
 		cout << "Specular Map: " << mat.specularMap.stem().string() << endl;
 
 	// UV info
-	if (!AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
+	if (!MathUtil::AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
 		cout << "Tiling: " << mat.uvScaling << endl;
-	if (!AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
+	if (!MathUtil::AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
 		cout << "Offset: " << mat.uvTranslation << endl;
 }
 
@@ -507,8 +507,8 @@ void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileNam
 	}
 
 	// UV info
-	if (!AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
+	if (!MathUtil::AlmostEqual(mat.uvScaling, FbxDouble2(1, 1)))
 		os << "\t" << "Tiling " << mat.uvScaling << endl;
-	if (!AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
+	if (!MathUtil::AlmostEqual(mat.uvTranslation, FbxDouble2(0, 0)))
 		os << "\t" << "Offset " << mat.uvTranslation << endl;
 }
