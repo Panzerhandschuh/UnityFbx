@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#include "MathUtil.h"
 #include "MeshImporter.h"
 
 using namespace std;
@@ -16,17 +15,11 @@ MeshImporter::MeshImporter(const path &inputFile)
 	FbxImporter *importer = FbxImporter::Create(manager, "");
 
 	if (!importer->Initialize(inputFile.string().c_str(), -1, manager->GetIOSettings()))
-	{
-		cout << "Failed to initialize fbx importer" << endl;
-		exit(EXIT_FAILURE);
-	}
+		throw runtime_error("Failed to initialize fbx importer");
 
 	scene = FbxScene::Create(manager, "scene");
 	importer->Import(scene); // Creates a .fbm folder in the inputFile directory and imports the scene
 	importer->Destroy();
-
-	if (!PrepareMeshes())
-		exit(EXIT_FAILURE);
 }
 
 MeshImporter::~MeshImporter()
@@ -36,375 +29,315 @@ MeshImporter::~MeshImporter()
 
 bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 {
+	// Get meshes
 	FbxArray<FbxNode*> fbxMeshes;
-	if (!GetFbxMeshes(fbxMeshes))
-		return false;
-
-	// Get total number of triangles
-	int numTriangles = 0;
-	for (int i = 0; i < fbxMeshes.Size(); i++)
+	GetAllMeshes(scene->GetRootNode(), fbxMeshes);
+	if (fbxMeshes.Size() == 0)
 	{
-		FbxMesh *fbxMesh = (FbxMesh*)fbxMeshes[i]->GetNodeAttribute();
-		numTriangles += fbxMesh->GetPolygonVertexCount();
+		cerr << "Import Error: No mesh objects detected" << endl;
+		return false;
+	}
+	else
+		cout << "Found " << fbxMeshes.Size() << " mesh(es) in the fbx file" << endl;
+
+	// Triangulate meshes
+	FbxGeometryConverter converter(manager);
+	if (!converter.Triangulate(scene, true))
+	{
+		cerr << "Import Error: Failed to triangulate scene" << endl;
+		return false;
 	}
 
+	// Merge meshes
+	FbxNode* fbxNode = converter.MergeMeshes(fbxMeshes, "Mesh1", scene);
+	if (!fbxNode)
+	{
+		cerr << "Import Error: Failed to merge meshes" << endl;
+		return false;
+	}
+
+	FbxMesh *fbxMesh = (FbxMesh*)fbxNode->GetNodeAttribute();
+
 	vector<Vector3> vertices;
-	vector<int> triangles(numTriangles);
 	vector<Vector3> normals;
 	vector<Vector2> uvs;
-	int currentVertexIndex = 0;
-	int startTriangleIndex = 0;
-	FbxVector4 centerPivotPoint;
+
+	FbxLayerElementArrayTemplate<int>* fbxMaterialIndices = NULL;
+	FbxGeometryElement::EMappingMode materialMappingMode = FbxGeometryElement::eNone;
+	if (fbxMesh->GetElementMaterial())
+	{
+		fbxMaterialIndices = &fbxMesh->GetElementMaterial()->GetIndexArray();
+		materialMappingMode = fbxMesh->GetElementMaterial()->GetMappingMode();
+	}
 
 	// Loop through triangle indices to find unique vertex normals
 	// If a unique vertex normal exists, duplicate the vertex
-	for (int meshIndex = 0; meshIndex < fbxMeshes.Size(); meshIndex++)
-	{
-		FbxMesh *fbxMesh = (FbxMesh*)fbxMeshes[meshIndex]->GetNodeAttribute();
-		FbxVector4 *fbxVertices = fbxMesh->GetControlPoints();
-		int numTriangles = fbxMesh->GetPolygonVertexCount();
-		int *fbxTriangles = fbxMesh->GetPolygonVertices();
+	FbxVector4 *fbxVertices = fbxMesh->GetControlPoints();
+	int *fbxTriangles = fbxMesh->GetPolygonVertices();
 
-		FbxArray<FbxVector4> fbxNormals;
+	FbxArray<FbxVector4> fbxNormals;
+	bool hasNormals = (fbxMesh->GetElementNormalCount() > 0);
+	if (hasNormals)
 		fbxMesh->GetPolygonVertexNormals(fbxNormals);
 
-		FbxArray<FbxVector2> fbxUvs;
-		bool hasUvs = (fbxMesh->GetElementUVCount() > 0);
-		if (hasUvs)
+	FbxArray<FbxVector2> fbxUvs;
+	bool hasUvs = (fbxMesh->GetElementUVCount() > 0);
+	if (hasUvs)
+	{
+		//FbxStringList uvNames;
+		//fbxMesh->GetUVSetNames(uvNames);
+		//fbxMesh->GetPolygonVertexUVs(uvNames[0], fbxUvs);
+
+		// Get UVs from all meshes (since MergeMeshes breaks uvs)
+		for (int i = 0; i < fbxMeshes.Size(); i++)
 		{
+			FbxMesh *tempFbxMesh = (FbxMesh*)fbxMeshes[i]->GetNodeAttribute();
+
 			FbxStringList uvNames;
-			fbxMesh->GetUVSetNames(uvNames);
-			fbxMesh->GetPolygonVertexUVs(uvNames[0], fbxUvs);
+			tempFbxMesh->GetUVSetNames(uvNames);
+			FbxArray<FbxVector2> tempFbxUvs;
+			tempFbxMesh->GetPolygonVertexUVs(uvNames[0], tempFbxUvs);
+
+			fbxUvs.AddArray(tempFbxUvs);
 		}
-		//cout << "Uv Count: " << fbxUvs.GetCount() << endl;
-		//cout << "Polygon Vertex Count: " << fbxMesh->GetPolygonVertexCount() << endl;
-		//cout << "Control Point Count: " << fbxMesh->GetControlPointsCount() << endl;
-		//FbxGeometryElementMaterial *material = fbxMesh->GetElementMaterial(0);
+	}
 
-		// Group identical normals together with their associated vertices
-		// If a vertex contains more than one unique normal vector or uv vector, duplicate it so it can be compatible with Unity engine
-		int numVertices = fbxMesh->GetControlPointsCount();
-		vector<VertexGroupInfo> *vertexNormalGroups = new vector<VertexGroupInfo>[numVertices];
+	// Group identical normals and uvs together with their associated vertices
+	// If a vertex contains more than one unique normal vector or uv, duplicate it so it can be compatible with Unity engine
+	int numControlPoints = fbxMesh->GetControlPointsCount();
+	int numPolygons = fbxMesh->GetPolygonCount();
+	vector<vector<VertexInfo>> vertexGroups(numControlPoints);
+	vector<int> materialIndices(numPolygons);
+	int tIndex = 0;
+	for (int pIndex = 0; pIndex < numPolygons; pIndex++)
+	{
+		int matIndex = 0;
+		if (fbxMaterialIndices && materialMappingMode == FbxGeometryElement::eByPolygon)
+			matIndex = fbxMaterialIndices->GetAt(pIndex);
+		materialIndices[pIndex] = matIndex;
 
-		for (int triangleIndex = 0; triangleIndex < numTriangles; triangleIndex++)
+		for (int pvIndex = 0; pvIndex < 3; pvIndex++)
 		{
-			int vertexIndex = fbxTriangles[triangleIndex];
-
+			int vIndex = fbxTriangles[tIndex];
 			bool foundGroup = false;
-			int size = vertexNormalGroups[vertexIndex].size();
-			for (int i = 0; i < size; i++)
+			for (int i = 0; i < vertexGroups[vIndex].size(); i++)
 			{
-				bool duplicateUv = (!hasUvs || vertexNormalGroups[vertexIndex][i].uv == fbxUvs[triangleIndex]);
-				if (vertexNormalGroups[vertexIndex][i].normal == fbxNormals[triangleIndex] && duplicateUv) // Duplicate normal and uv found
+				bool duplicateNormal = (!hasNormals || vertexGroups[vIndex][i].normal == fbxNormals[tIndex]);
+				bool duplicateUv = (!hasUvs || vertexGroups[vIndex][i].uv == fbxUvs[tIndex]);
+				if (duplicateNormal && duplicateUv) // Duplicate normal and uv found
 				{
-					// Add new triangle index to existing group
-					vertexNormalGroups[vertexIndex][i].triangleIndices.push_back(triangleIndex);
+					// Add triangle index to existing group
+					vertexGroups[vIndex][i].triangles.push_back(tIndex);
 					foundGroup = true;
+					break;
 				}
 			}
+
 			if (!foundGroup)
 			{
-				// Add a new normal group
-				VertexGroupInfo info;
-				info.normal = fbxNormals[triangleIndex];
+				// Add a new vertex info
+				VertexInfo info;
+				if (hasNormals)
+					info.normal = fbxNormals[tIndex];
 				if (hasUvs)
-					info.uv = fbxUvs[triangleIndex];
-				info.triangleIndices.push_back(triangleIndex);
-				vertexNormalGroups[vertexIndex].push_back(info);
+					info.uv = fbxUvs[tIndex];
+				info.triangles.push_back(tIndex);
+
+				vertexGroups[vIndex].push_back(info);
 			}
+
+			tIndex++;
 		}
+	}
 
-		// Mesh position offset info
-		//FbxVector4 lclTranslation = fbxMeshes[meshIndex]->LclTranslation.Get();
-		//FbxVector4 lclRotation = fbxMeshes[meshIndex]->LclRotation.Get();
-		//FbxVector4 lclScaling = fbxMeshes[meshIndex]->LclScaling.Get();
-		//FbxAMatrix lclTransform(lclTranslation, lclRotation, lclScaling);
-		FbxAMatrix lclTransform = fbxMeshes[meshIndex]->EvaluateLocalTransform();
-		FbxVector4 lclTranslation = lclTransform.GetT();
+	// Mesh position offset info
+	//FbxAMatrix lclTransform = fbxNode->EvaluateLocalTransform();
+	//lclTransform.SetT(positionOffset);
 
-		if (meshIndex == 0)
-			centerPivotPoint = lclTranslation;
-		FbxVector4 positionOffset = lclTranslation - centerPivotPoint;
-		lclTransform.SetT(positionOffset);
+	// Get transform matrices
+	FbxAMatrix geometry = FbxUtil::GetGeometry(fbxNode);
+	FbxAMatrix invGeom = geometry.Inverse().Transpose();
 
-		// Get transform matrices
-		FbxAMatrix geometry = FbxUtil::GetGeometry(fbxMeshes[meshIndex]);
-		FbxAMatrix transform = lclTransform * geometry;
-		FbxAMatrix invTrans = transform.Inverse().Transpose();
-
-		// Construct Unity engine style mesh
-		for (int vertexIndex = 0; vertexIndex < numVertices; vertexIndex++)
+	// Construct Unity engine style mesh
+	int cvIndex = 0;
+	vector<int> triangles(numPolygons * 3);
+	for (int vIndex = 0; vIndex < numControlPoints; vIndex++)
+	{
+		vector<VertexInfo> vertexGroup = vertexGroups[vIndex];
+		for (int vgIndex = 0; vgIndex < vertexGroup.size(); vgIndex++)
 		{
-			int numNormalGroups = vertexNormalGroups[vertexIndex].size();
+			// Add vertex info to unity mesh
+			Vector3 vertex;
+			FbxVector4 transformedVertex = geometry.MultT(fbxVertices[vIndex]);
+			vertex.x = (float)transformedVertex[0];
+			vertex.y = (float)transformedVertex[1];
+			vertex.z = (float)transformedVertex[2];
+			vertices.push_back(vertex);
 
-			for (int normalGroupIndex = 0; normalGroupIndex < numNormalGroups; normalGroupIndex++)
+			VertexInfo info = vertexGroup[vgIndex];
+
+			// Add normal info to unity mesh
+			if (hasNormals)
 			{
-				// Add vertex info to unity mesh
-				Vector3 vertex;
-				FbxVector4 transformedVertex = transform.MultT(fbxVertices[vertexIndex]);
-				vertex.x = (float)transformedVertex[0];
-				vertex.y = (float)transformedVertex[1];
-				vertex.z = (float)transformedVertex[2];
-				vertices.push_back(vertex);
-
-				// Get triangle indices
-				std::vector<int> triangleIndices = vertexNormalGroups[vertexIndex][normalGroupIndex].triangleIndices;
-				int numIndices = triangleIndices.size();
-
-				// Add normal info to unity mesh
 				Vector3 normal;
-				FbxVector4 transformedNormal = invTrans.MultT(fbxNormals[triangleIndices[0]]);
+				FbxVector4 transformedNormal = invGeom.MultT(info.normal);
 				transformedNormal.Normalize();
 				normal.x = (float)transformedNormal[0];
 				normal.y = (float)transformedNormal[1];
 				normal.z = (float)transformedNormal[2];
 				normals.push_back(normal);
-
-				// Add uv info to unity mesh
-				if (hasUvs)
-				{
-					Vector2 uv;
-					uv.x = (float)fbxUvs[triangleIndices[0]][0];
-					uv.y = (float)fbxUvs[triangleIndices[0]][1];
-					uvs.push_back(uv);
-				}
-
-				for (int triangleIndex = 0; triangleIndex < numIndices; triangleIndex++)
-				{
-					// Add triangle info to unity mesh
-					int currentTriangleIndex = triangleIndices[triangleIndex];
-					triangles[startTriangleIndex + currentTriangleIndex] = currentVertexIndex;
-				}
-
-				currentVertexIndex++;
 			}
-		}
 
-		startTriangleIndex += fbxMesh->GetPolygonVertexCount();
-		delete[] vertexNormalGroups;
+			// Add uv info to unity mesh
+			if (hasUvs)
+			{
+				Vector2 uv;
+				uv.x = (float)info.uv[0];
+				uv.y = (float)info.uv[1];
+				uvs.push_back(uv);
+			}
+
+			// Set triangles
+			for (int tIndex = 0; tIndex < info.triangles.size(); tIndex++)
+			{
+				// Add triangle info to unity mesh
+				int itIndex = info.triangles[tIndex];
+				triangles[itIndex] = cvIndex;
+			}
+
+			cvIndex++;
+		}
+	}
+
+	// Map material indices to triangles
+	int numMaterialIndices = *max_element(materialIndices.begin(), materialIndices.end()) + 1;
+	vector<vector<int>> subMeshTriangles(numMaterialIndices);
+	for (int i = 0; i < materialIndices.size(); i++)
+	{
+		int matIndex = materialIndices[i];
+		subMeshTriangles[matIndex].push_back(triangles[i * 3]);
+		subMeshTriangles[matIndex].push_back(triangles[(i * 3) + 1]);
+		subMeshTriangles[matIndex].push_back(triangles[(i * 3) + 2]);
 	}
 
 	mesh.vertices = vertices;
-	mesh.triangles = triangles;
 	mesh.normals = normals;
+	mesh.uvs = uvs;
+	mesh.triangles = triangles;
+	mesh.subMeshTriangles = subMeshTriangles;
 
-	// Import uvs, material ids, and material info
+	// Import material info
 	if (importMaterials)
 	{
 		vector<Material> materials;
-		vector<int> materialIds;
-		GetMaterials(fbxMeshes, materials, materialIds);
+		GetMaterials(fbxNode, materials);
 
-		mesh.uvs = uvs;
-		mesh.materialIds = materialIds;
 		mesh.materials = materials;
 	}
 
 	return true;
 }
 
-bool MeshImporter::PrepareMeshes()
+void MeshImporter::GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes)
 {
-	// Find all mesh nodes
-	FbxArray<FbxNode*> fbxMeshes;
-	if (!GetFbxMeshes(fbxMeshes))
-		return false;
-
-	cout << "Found " << fbxMeshes.Size() << " mesh(es) in the fbx file" << endl;
-
-	// Triangulate meshes if they aren't already
-	FbxGeometryConverter converter(manager);
-	for (int meshIndex = 0; meshIndex < fbxMeshes.Size(); meshIndex++)
+	FbxNodeAttribute *attribute = node->GetNodeAttribute();
+	if (attribute)
 	{
-		FbxMesh *tempMesh = (FbxMesh*)fbxMeshes[meshIndex]->GetNodeAttribute();
-		if (!tempMesh->IsTriangleMesh())
-		{
-			if (!converter.Triangulate(scene, true, true))
-			{
-				cout << "Failed to triangulate meshes" << endl;
-				return false;
-			}
-			else
-				cout << "Meshes Triangulated" << endl;
-			break;
-		}
-	}
-	cout << endl;
-
-	return true;
-}
-
-bool MeshImporter::GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes)
-{
-	// Get root node
-	FbxNode *rootNode = scene->GetRootNode();
-	if (!rootNode)
-	{
-		cout << "Error loading mesh. Fbx scene has no root node" << endl;
-		return false;
-	}
-
-	for (int i = 0; i < rootNode->GetChildCount(); i++)
-		GetMeshNodes(rootNode->GetChild(i), fbxMeshes);
-
-	return true;
-}
-
-void MeshImporter::GetMeshNodes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes)
-{
-	if (node->GetNodeAttribute() != NULL)
-	{
-		FbxNodeAttribute::EType attribute = node->GetNodeAttribute()->GetAttributeType();
-		if (attribute == FbxNodeAttribute::eMesh)
+		FbxNodeAttribute::EType attributeType = attribute->GetAttributeType();
+		if (attributeType == FbxNodeAttribute::eMesh)
 			fbxMeshes.Add(node);
 	}
-	
+
 	// Get mesh nodes recursively
 	for (int i = 0; i < node->GetChildCount(); i++)
-		GetMeshNodes(node->GetChild(i), fbxMeshes);
+		GetAllMeshes(node->GetChild(i), fbxMeshes);
 }
 
-void MeshImporter::GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices)
+void MeshImporter::GetMaterials(FbxNode *node, vector<Material> &materials)
 {
-	int materialNumber = 0;
-	for (int meshIndex = 0; meshIndex < meshes.Size(); meshIndex++)
+	FbxMesh *mesh = (FbxMesh*)node->GetNodeAttribute();
+
+	vector<int> currentMaterialIndices;
+	GetMaterialIndices(mesh, currentMaterialIndices);
+	if (node->GetMaterialCount() == 0) // Mesh contains no materials
 	{
-		FbxMesh *mesh = (FbxMesh*)meshes[meshIndex]->GetNodeAttribute();
-		FbxNode *node = mesh->GetNode();
-		if (!node)
+		//cout << "no mats" << endl;
+		// Create default material
+		Material mat;
+		Material::LoadDefault(mat);
+		materials.push_back(mat);
+	}
+	else // Mesh contains one or more materials
+	{
+		for (int mIndex = 0; mIndex < node->GetMaterialCount(); mIndex++)
 		{
-			cout << "Texture import error: Could not get mesh node." << endl << endl;
-			return;
-		}
-		vector<int> currentMaterialIndices;
-		GetMaterialIndices(mesh, currentMaterialIndices);
-		if (node->GetMaterialCount() == 0)
-		{
-			//cout << "no mats" << endl;
-			// Create default material
-			Material materialProperties;
-			Material::LoadDefault(materialProperties);
-			// Check for duplicate material
-			vector<Material>::iterator it = find(materials.begin(), materials.end(), materialProperties);
-			if (it != materials.end()) // Duplicate exists, copy material ids from duplicate
+			// Create material properties
+			Material mat;
+			Material::LoadDefault(mat); // Use default properties in case something goes wrong
+
+			FbxSurfaceMaterial *material = node->GetMaterial(mIndex);
+			if (!material)
 			{
-				int index = distance(materials.begin(), it);
-				for (unsigned int i = 0; i < currentMaterialIndices.size(); i++)
-					materialIndices.push_back(index);
+				cout << "Material Import Warning: Could not get material from mesh node" << endl << endl;
+				materials.push_back(mat);
+				return;
 			}
-			else // No duplicate found, push back new material and add new indices
+
+			// Get material info
+			mat.diffuseMap = GetTexturePath(material, FbxSurfaceMaterial::sDiffuse);
+			mat.normalMap = GetTexturePath(material, FbxSurfaceMaterial::sNormalMap);
+			mat.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
+			if (material->GetClassId().Is(FbxSurfacePhong::ClassId))
 			{
-				materials.push_back(materialProperties);
-				for (unsigned int i = 0; i < currentMaterialIndices.size(); i++)
-					materialIndices.push_back(materialNumber);
-				materialNumber++;
+				FbxSurfacePhong *phong = (FbxSurfacePhong*)material;
+
+				mat.color = phong->Diffuse;
+
+				FbxProperty property = phong->FindProperty("Opacity");
+				if (property.IsValid())
+				{
+					FbxDouble opacity = property.Get<FbxDouble>();
+					mat.hasOpacity = opacity < 1;
+					if (mat.hasOpacity)
+						mat.opacity = opacity;
+				}
 			}
-			//AddMaterial(materialProperties, materials, materialIndices);
-		}
-		else // Node contains one or more materials
-		{
-			int currentValidIndex = 0;
-			int startMaterialNumber = materialNumber;
-			vector<int> materialOffsets(currentMaterialIndices.size(), 0);
-			for (int materialIndex = 0; materialIndex < node->GetMaterialCount(); materialIndex++)
+			else if (material->GetClassId().Is(FbxSurfaceLambert::ClassId))
 			{
-				// Create material properties
-				Material materialProperties;
-				Material::LoadDefault(materialProperties); // Use default properties in case something goes wrong
+				FbxSurfaceLambert *lambert = (FbxSurfaceLambert*)material;
 
-				FbxSurfaceMaterial *material = node->GetMaterial(materialIndex);
-				if (!material)
+				mat.color = lambert->Diffuse;
+
+				FbxProperty property = lambert->FindProperty("Opacity");
+				if (property.IsValid())
 				{
-					cout << "Texture import error: Could not get material from mesh node" << endl << endl;
-					return;
+					FbxDouble opacity = property.Get<FbxDouble>();
+					mat.hasOpacity = opacity < 1;
+					if (mat.hasOpacity)
+						mat.opacity = opacity;
 				}
-
-				// Ignore material if it is not in the material index array
-				if (find(currentMaterialIndices.begin(), currentMaterialIndices.end(), materialIndex) == currentMaterialIndices.end())
-					continue;
-
-				// Get material info
-				materialProperties.diffuseMap = GetTexturePath(material, FbxSurfaceMaterial::sDiffuse);
-				materialProperties.normalMap = GetTexturePath(material, FbxSurfaceMaterial::sNormalMap);
-				materialProperties.specularMap = GetTexturePath(material, FbxSurfaceMaterial::sSpecular);
-				if (material->GetClassId().Is(FbxSurfacePhong::ClassId))
-				{
-					FbxSurfacePhong *phong = (FbxSurfacePhong*)material;
-
-					materialProperties.color = phong->Diffuse;
-
-					FbxProperty property = phong->FindProperty("Opacity");
-					if (property.IsValid())
-					{
-						FbxDouble opacity = property.Get<FbxDouble>();
-						materialProperties.hasOpacity = opacity < 1;
-						if (materialProperties.hasOpacity)
-							materialProperties.opacity = opacity;
-					}
-				}
-				else if (material->GetClassId().Is(FbxSurfaceLambert::ClassId))
-				{
-					FbxSurfaceLambert *lambert = (FbxSurfaceLambert*)material;
-
-					materialProperties.color = lambert->Diffuse;
-
-					FbxProperty property = lambert->FindProperty("Opacity");
-					if (property.IsValid())
-					{
-						FbxDouble opacity = property.Get<FbxDouble>();
-						materialProperties.hasOpacity = opacity < 1;
-						if (materialProperties.hasOpacity)
-							materialProperties.opacity = opacity;
-					}
-				}
-				else
-					cout << "Warning: Unknown material type" << endl;
-
-				// Get uv info
-				FbxProperty property = material->FindProperty(FbxSurfaceMaterial::sDiffuse);
-				FbxTexture *texture = property.GetSrcObject<FbxTexture>();
-				if (texture)
-				{
-					materialProperties.uvScaling[0] = texture->GetScaleU();
-					materialProperties.uvScaling[1] = texture->GetScaleV();
-
-					materialProperties.uvTranslation[0] = texture->GetTranslationU();
-					materialProperties.uvTranslation[1] = texture->GetTranslationV();
-				}
-
-				// Check if this is a duplicate material
-				vector<Material>::iterator it = find(materials.begin(), materials.end(), materialProperties);
-				if (it != materials.end()) // Duplicate found, set material indices to duplicate indices
-				{
-					//cout << "Duplicate material found" << endl;
-					int index = distance(materials.begin(), it);
-					replace(currentMaterialIndices.begin(), currentMaterialIndices.end(), materialIndex, index);
-				}
-				else // No duplicate exists
-				{
-					//cout << "No duplicate material found" << endl;
-					materials.push_back(materialProperties);
-					for (unsigned int i = 0; i < currentMaterialIndices.size(); i++) // Set material offsets
-					{
-						if (currentMaterialIndices[i] == materialIndex)
-							materialOffsets[i] = startMaterialNumber;
-					}
-					if (currentValidIndex != materialIndex) // Normalize material array to only include valid Ids
-						replace(currentMaterialIndices.begin(), currentMaterialIndices.end(), materialIndex, currentValidIndex);
-					currentValidIndex++;
-					materialNumber++;
-				}
-				//AddMaterial(materialProperties, materials, materialIndices);
 			}
-			for (unsigned int i = 0; i < currentMaterialIndices.size(); i++)
-				materialIndices.push_back(currentMaterialIndices[i] + materialOffsets[i]);
+			else
+				cout << "Material Import Warning: Unknown material type" << endl;
+
+			// Get uv info
+			FbxProperty property = material->FindProperty(FbxSurfaceMaterial::sDiffuse);
+			FbxTexture *texture = property.GetSrcObject<FbxTexture>();
+			if (texture)
+			{
+				mat.uvScaling[0] = texture->GetScaleU();
+				mat.uvScaling[1] = texture->GetScaleV();
+
+				mat.uvTranslation[0] = texture->GetTranslationU();
+				mat.uvTranslation[1] = texture->GetTranslationV();
+			}
+
+			materials.push_back(mat);
 		}
-		//for (int i = 0; i < materialIndices.size(); i++)
-		//	cout << materialIndices[i];
-		//cout << endl;
 	}
 }
 
+// Get triangle indices associated with each material
 void MeshImporter::GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices)
 {
 	FbxGeometryElementMaterial *material = mesh->GetElementMaterial(0);
@@ -423,7 +356,7 @@ void MeshImporter::GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndice
 		for (int i = 0; i < material->GetIndexArray().GetCount(); i++)
 		{
 			materialIndices.push_back(material->GetIndexArray().GetAt(i));
-			//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex] << " ";
+			//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex << " ";
 		}
 		//cout << endl << endl;
 	}

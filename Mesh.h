@@ -17,10 +17,10 @@ struct Vector2
 struct Mesh
 {
 	std::vector<Vector3> vertices;
-	std::vector<int> triangles;
 	std::vector<Vector3> normals;
 	std::vector<Vector2> uvs;
-	std::vector<int> materialIds;
+	std::vector<int> triangles;
+	std::vector<std::vector<int>> subMeshTriangles;
 	std::vector<Material> materials;
 };
 

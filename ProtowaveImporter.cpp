@@ -26,7 +26,7 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
 void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
 void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
-void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles);
+void CreateDDSFile(const path &materialsDir, const path &texturePath, vector<string> &createdFiles);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
 ostream& operator<<(ostream& os, const FbxDouble3 &d3);
 ofstream& operator<<(ofstream& os, const FbxDouble2 &d2);
@@ -228,12 +228,6 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 			for (int j = 0; j < numVertices; j++)
 				writer.Write(mesh.vertices[j]);
 
-			// Triangles
-			int numTriangles = mesh.triangles.size();
-			writer.Write(numTriangles);
-			for (int j = 0; j < numTriangles; j++)
-				writer.Write(mesh.triangles[j]);
-
 			// Normals
 			int numNormals = 0;
 			if (importNormals)
@@ -248,19 +242,23 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 			for (int j = 0; j < numUvs; j++)
 				writer.Write(mesh.uvs[j]);
 
-			// Material ids
-			int numMaterialIds = mesh.materialIds.size();
-			writer.Write(numMaterialIds);
-			for (int j = 0; j < numMaterialIds; j++)
-				writer.Write(mesh.materialIds[j]);
+			// Sub mesh triangles
+			int subMeshCount = mesh.subMeshTriangles.size();
+			writer.Write(subMeshCount);
+			for (int j = 0; j < subMeshCount; j++)
+			{
+				int numTriangles = mesh.subMeshTriangles[j].size();
+				writer.Write(numTriangles);
+				for (int k = 0; k < numTriangles; k++)
+					writer.Write(mesh.subMeshTriangles[j][k]);
+			}
 
 			// Print mesh info
 			cout << "Mesh " << i << ":" << endl;
 			cout << "Vertex Count: " << numVertices << endl;
-			cout << "Triangle Index Count: " << numTriangles << endl;
 			cout << "Normal Count: " << numNormals << endl;
-			cout << "Uv Count: " << numUvs << endl;
-			cout << "Material Id Count: " << numMaterialIds << endl;
+			cout << "UV Count: " << numUvs << endl;
+			cout << "Triangle Count: " << mesh.triangles.size() << endl;
 			cout << "Material Count: " << mesh.materials.size() << endl;
 			cout << endl;
 		}
@@ -295,12 +293,6 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 			for (int j = 0; j < numVertices; j++)
 				writer.Write(mesh.vertices[j]);
 
-			// Triangles
-			int numTriangles = mesh.triangles.size();
-			writer.Write(numTriangles);
-			for (int j = 0; j < numTriangles; j++)
-				writer.Write(mesh.triangles[j]);
-
 			// Normals
 			int numNormals = 0;
 			if (importNormals)
@@ -309,11 +301,17 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 			for (int j = 0; j < numNormals; j++)
 				writer.Write(mesh.normals[j]);
 
+			// Triangles
+			int numTriangles = mesh.triangles.size();
+			writer.Write(numTriangles);
+			for (int j = 0; j < numTriangles; j++)
+				writer.Write(mesh.triangles[j]);
+
 			// Print mesh info
 			cout << "Mesh " << i + 1 << ":" << endl;
 			cout << "Vertex Count: " << numVertices << endl;
-			cout << "Triangle Index Count: " << numTriangles << endl;
 			cout << "Normal Count: " << numNormals << endl;
+			cout << "Triangle Count: " << numTriangles << endl;
 			cout << endl;
 		}
 	}
@@ -372,13 +370,10 @@ void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<strin
 		cout << "Warning: Missing texconv.exe, textures will not be saved." << endl;
 }
 
-void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &createdFiles)
+void CreateDDSFile(const path &materialsDir, const path &texturePath, vector<string> &createdFiles)
 {
 	if (texturePath.empty()) // Skip empty textures
-	{
-		texturePath = "";
 		return;
-	}
 
 	try
 	{
@@ -409,8 +404,7 @@ void CreateDDSFile(const path &materialsDir, path &texturePath, vector<string> &
 	catch (exception &e)
 	{
 		cerr << e.what() << endl;
-		cerr << "DDS Error: Could not read source image info, DDS file will not be generated" << endl;
-		texturePath = "";
+		cerr << "Create DDS Error: Could not read source image info, DDS file will not be generated" << endl;
 	}
 }
 

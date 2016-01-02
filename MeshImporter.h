@@ -4,8 +4,11 @@
 #include <fbxsdk.h>
 #include <iostream>
 #include <vector>
+#include <exception>
+#include <algorithm>
 #include <boost/filesystem.hpp>
 #include "Mesh.h"
+#include "MathUtil.h"
 #include "FbxUtil.h"
 
 class MeshImporter
@@ -20,19 +23,17 @@ private:
 	FbxScene *scene;
 	FbxManager *manager;
 
-	bool PrepareMeshes();
-	bool GetFbxMeshes(FbxArray<FbxNode*> &fbxMeshes);
-	void GetMeshNodes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes);
-	void GetMaterials(const FbxArray<FbxNode*> &meshes, vector<Material> &materials, vector<int> &materialIndices);
+	void GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes);
+	void GetMaterials(FbxNode *node, vector<Material> &materials);
 	void GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices);
 	path GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName);
 };
 
-struct VertexGroupInfo
+struct VertexInfo
 {
 	FbxVector4 normal;
 	FbxVector2 uv;
-	vector<int> triangleIndices;
+	vector<int> triangles;
 };
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix);
