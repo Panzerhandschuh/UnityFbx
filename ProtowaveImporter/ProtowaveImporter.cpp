@@ -320,7 +320,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 
 	for (unsigned int i = 0; i < materials.size(); i++)
 	{
-		file << "Standard" << endl;
+		file << "Material Standard" << endl;
 		file << "{" << endl;
 		WriteMaterial(file, materials[i], pwmdlFileName);
 		file << "}";
