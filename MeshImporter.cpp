@@ -27,8 +27,18 @@ MeshImporter::~MeshImporter()
 	manager->Destroy();
 }
 
-bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
+bool MeshImporter::Import(Mesh &mesh, bool isCollider)
 {
+	this->isCollider = isCollider;
+
+	// Triangulate scene
+	FbxGeometryConverter converter(manager);
+	if (!converter.Triangulate(scene, true))
+	{
+		cerr << "Import Error: Failed to triangulate scene" << endl;
+		return false;
+	}
+
 	// Get meshes
 	FbxArray<FbxNode*> fbxMeshes;
 	GetAllMeshes(scene->GetRootNode(), fbxMeshes);
@@ -37,19 +47,11 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		cerr << "Import Error: No mesh objects detected" << endl;
 		return false;
 	}
-	else
-		cout << "Found " << fbxMeshes.Size() << " mesh(es) in the fbx file" << endl;
-
-	// Triangulate meshes
-	FbxGeometryConverter converter(manager);
-	if (!converter.Triangulate(scene, true))
-	{
-		cerr << "Import Error: Failed to triangulate scene" << endl;
-		return false;
-	}
+	//else
+	//	cout << "Found " << fbxMeshes.Size() << " mesh(es) in the fbx file" << endl;
 
 	// Merge meshes
-	FbxNode* fbxNode = converter.MergeMeshes(fbxMeshes, "Mesh1", scene);
+	FbxNode* fbxNode = converter.MergeMeshes(fbxMeshes, "Mesh", scene);
 	if (!fbxNode)
 	{
 		cerr << "Import Error: Failed to merge meshes" << endl;
@@ -58,17 +60,45 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 	FbxMesh *fbxMesh = (FbxMesh*)fbxNode->GetNodeAttribute();
 
-	vector<Vector3> vertices;
-	vector<Vector3> normals;
-	vector<Vector2> uvs;
+	//ProcessNode(scene->GetRootNode(), meshes, -1);
+	mesh = ProcessMesh(fbxMesh, fbxMeshes);
 
-	FbxLayerElementArrayTemplate<int>* fbxMaterialIndices = NULL;
-	FbxGeometryElement::EMappingMode materialMappingMode = FbxGeometryElement::eNone;
-	if (fbxMesh->GetElementMaterial())
-	{
-		fbxMaterialIndices = &fbxMesh->GetElementMaterial()->GetIndexArray();
-		materialMappingMode = fbxMesh->GetElementMaterial()->GetMappingMode();
-	}
+	return true;
+}
+
+//void MeshImporter::ProcessNode(FbxNode *node, vector<Mesh> &meshes, int parentIndex)
+//{
+//	FbxNodeAttribute *attribute = node->GetNodeAttribute();
+//	if (attribute)
+//	{
+//		FbxNodeAttribute::EType attributeType = attribute->GetAttributeType();
+//		if (attributeType == FbxNodeAttribute::eMesh)
+//		{
+//			FbxMesh *fbxMesh = node->GetMesh();
+//			Mesh mesh = ProcessMesh(fbxMesh);
+//			mesh.parentIndex = parentIndex;
+//			parentIndex++;
+//			meshes.push_back(mesh);
+//		}
+//	}
+//
+//	for (int i = 0; i < node->GetChildCount(); i++)
+//		ProcessNode(node->GetChild(i), meshes, parentIndex);
+//}
+
+Mesh MeshImporter::ProcessMesh(FbxMesh *fbxMesh, FbxArray<FbxNode*> fbxMeshes)
+{
+	// Get transform matrices
+	FbxNode *node = fbxMesh->GetNode();
+	//FbxAMatrix globalTransform = node->EvaluateGlobalTransform();
+	////FbxAMatrix lclTransform = node->EvaluateLocalTransform();
+	//FbxAMatrix geometry = FbxUtil::GetGeometry(node);
+	//FbxAMatrix transform = globalTransform * geometry;
+
+	//mesh.name = node->GetName();
+	//mesh.translation = transform.GetT();
+	//mesh.rotation = transform.GetR();
+	//mesh.scale = transform.GetS();
 
 	// Loop through triangle indices to find unique vertex normals
 	// If a unique vertex normal exists, duplicate the vertex
@@ -100,6 +130,14 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 
 			fbxUvs.AddArray(tempFbxUvs);
 		}
+	}
+
+	FbxLayerElementArrayTemplate<int> *fbxMaterialIndices = NULL;
+	FbxGeometryElement::EMappingMode materialMappingMode = FbxGeometryElement::eNone;
+	if (fbxMesh->GetElementMaterial())
+	{
+		fbxMaterialIndices = &fbxMesh->GetElementMaterial()->GetIndexArray();
+		materialMappingMode = fbxMesh->GetElementMaterial()->GetMappingMode();
 	}
 
 	// Group identical normals and uvs together with their associated vertices
@@ -150,50 +188,34 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		}
 	}
 
-	// Mesh position offset info
-	//FbxAMatrix lclTransform = fbxNode->EvaluateLocalTransform();
-	//lclTransform.SetT(positionOffset);
-
-	// Get transform matrices
-	FbxAMatrix geometry = FbxUtil::GetGeometry(fbxNode);
-	FbxAMatrix invGeom = geometry.Inverse().Transpose();
-
 	// Construct Unity engine style mesh
-	int cvIndex = 0;
+	int cvIndex = 0; // Used for tracking vertex indices
+	vector<Vector3> vertices;
+	vector<Vector3> normals;
+	vector<Vector2> uvs;
 	vector<int> triangles(numPolygons * 3);
 	for (int vIndex = 0; vIndex < numControlPoints; vIndex++)
 	{
 		vector<VertexInfo> vertexGroup = vertexGroups[vIndex];
 		for (int vgIndex = 0; vgIndex < vertexGroup.size(); vgIndex++)
 		{
-			// Add vertex info to unity mesh
-			Vector3 vertex;
-			FbxVector4 transformedVertex = geometry.MultT(fbxVertices[vIndex]);
-			vertex.x = (float)transformedVertex[0];
-			vertex.y = (float)transformedVertex[1];
-			vertex.z = (float)transformedVertex[2];
-			vertices.push_back(vertex);
-
 			VertexInfo info = vertexGroup[vgIndex];
+
+			// Add vertex info to unity mesh
+			Vector3 vertex = fbxVertices[vIndex];
+			vertices.push_back(vertex);
 
 			// Add normal info to unity mesh
 			if (hasNormals)
 			{
-				Vector3 normal;
-				FbxVector4 transformedNormal = invGeom.MultT(info.normal);
-				transformedNormal.Normalize();
-				normal.x = (float)transformedNormal[0];
-				normal.y = (float)transformedNormal[1];
-				normal.z = (float)transformedNormal[2];
+				Vector3 normal = info.normal;
 				normals.push_back(normal);
 			}
 
 			// Add uv info to unity mesh
 			if (hasUvs)
 			{
-				Vector2 uv;
-				uv.x = (float)info.uv[0];
-				uv.y = (float)info.uv[1];
+				Vector2 uv = info.uv;
 				uvs.push_back(uv);
 			}
 
@@ -220,22 +242,21 @@ bool MeshImporter::Import(Mesh &mesh, bool importMaterials)
 		subMeshTriangles[matIndex].push_back(triangles[(i * 3) + 2]);
 	}
 
+	Mesh mesh;
 	mesh.vertices = vertices;
 	mesh.normals = normals;
 	mesh.uvs = uvs;
 	mesh.triangles = triangles;
 	mesh.subMeshTriangles = subMeshTriangles;
 
-	// Import material info
-	if (importMaterials)
+	if (!isCollider)
 	{
-		vector<Material> materials;
-		GetMaterials(fbxNode, materials);
-
+		// Import material info
+		vector<Material> materials = GetMaterials(node);
 		mesh.materials = materials;
 	}
 
-	return true;
+	return mesh;
 }
 
 void MeshImporter::GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes)
@@ -253,12 +274,10 @@ void MeshImporter::GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes)
 		GetAllMeshes(node->GetChild(i), fbxMeshes);
 }
 
-void MeshImporter::GetMaterials(FbxNode *node, vector<Material> &materials)
+vector<Material> MeshImporter::GetMaterials(FbxNode *node)
 {
-	FbxMesh *mesh = (FbxMesh*)node->GetNodeAttribute();
+	vector<Material> materials;
 
-	vector<int> currentMaterialIndices;
-	GetMaterialIndices(mesh, currentMaterialIndices);
 	if (node->GetMaterialCount() == 0) // Mesh contains no materials
 	{
 		//cout << "no mats" << endl;
@@ -278,9 +297,9 @@ void MeshImporter::GetMaterials(FbxNode *node, vector<Material> &materials)
 			FbxSurfaceMaterial *material = node->GetMaterial(mIndex);
 			if (!material)
 			{
-				cout << "Material Import Warning: Could not get material from mesh node" << endl << endl;
+				cout << "Material Import Warning: Could not get material from mesh node, using default material properties" << endl << endl;
 				materials.push_back(mat);
-				return;
+				continue;
 			}
 
 			// Get material info
@@ -335,31 +354,8 @@ void MeshImporter::GetMaterials(FbxNode *node, vector<Material> &materials)
 			materials.push_back(mat);
 		}
 	}
-}
 
-// Get triangle indices associated with each material
-void MeshImporter::GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices)
-{
-	FbxGeometryElementMaterial *material = mesh->GetElementMaterial(0);
-	//cout << "Num Materials: " << material->GetIndexArray().GetCount() << endl;
-	if (!material || material->GetMappingMode() == FbxLayerElement::EMappingMode::eAllSame)
-	{
-		for (int i = 0; i < mesh->GetPolygonCount(); i++)
-		{
-			materialIndices.push_back(0);
-			//cout << materialIndices[startMaterialIndex] << " ";
-		}
-		//cout << endl << endl;
-	}
-	else if (material->GetMappingMode() == FbxLayerElement::EMappingMode::eByPolygon)
-	{
-		for (int i = 0; i < material->GetIndexArray().GetCount(); i++)
-		{
-			materialIndices.push_back(material->GetIndexArray().GetAt(i));
-			//cout << materialIndices[material->GetIndexArray().GetAt(i) + startMaterialIndex << " ";
-		}
-		//cout << endl << endl;
-	}
+	return materials;
 }
 
 path MeshImporter::GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName)

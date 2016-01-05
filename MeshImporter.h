@@ -16,16 +16,18 @@ class MeshImporter
 public:
 	MeshImporter(const path &inputFile);
 	~MeshImporter();
-	bool Import(Mesh &mesh, bool importMaterials = true);
+	bool Import(Mesh &mesh, bool isCollider = false);
 
 private:
 	path fbxFile;
 	FbxScene *scene;
 	FbxManager *manager;
+	bool isCollider;
 
+	//void ProcessNode(FbxNode *node, vector<Mesh> &meshes, int parentIndex);
+	Mesh ProcessMesh(FbxMesh *fbxMesh, FbxArray<FbxNode*> fbxMeshes);
 	void GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes);
-	void GetMaterials(FbxNode *node, vector<Material> &materials);
-	void GetMaterialIndices(FbxMesh *mesh, vector<int> &materialIndices);
+	vector<Material> GetMaterials(FbxNode *node);
 	path GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName);
 };
 

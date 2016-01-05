@@ -22,10 +22,10 @@ const int PWMDL_VERSION = 1;
 const int PWCOL_VERSION = 1;
 
 void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFiles, bool importMaterials = true);
-void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
-void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals = true);
-void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes);
-void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles);
+void WriteMeshToFile(const path &outputFile, const Mesh &mesh, bool importNormals = true);
+void WriteCollisionsToFile(const path &outputFile, const Mesh &mesh, bool importNormals = true);
+void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Material> &materials);
+void CreateDDSFiles(const path &materialsDir, const vector<Material> &materials, vector<string> &createdFiles);
 void CreateDDSFile(const path &materialsDir, const path &texturePath, vector<string> &createdFiles);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
 ostream& operator<<(ostream& os, const FbxDouble3 &d3);
@@ -148,10 +148,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	MeshImporter importer(inputFile);
 
 	// Import fbx file
-	vector<Mesh> meshes;
+	//vector<Mesh> meshes;
 	Mesh mesh;
-	meshes.push_back(mesh);
-	if (!importer.Import(meshes[0], !isCollider))
+	if (!importer.Import(mesh, isCollider))
 		exit(EXIT_FAILURE);
 
 	// Write the imported mesh info to files
@@ -159,11 +158,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	{
 		// Create files
 		vector<string> createdFiles;
-		CreateDDSFiles(texturesDir, meshes, createdFiles);
+		CreateDDSFiles(texturesDir, mesh.materials, createdFiles);
 		path pwmdlFile(inputFile.stem().string() + ".pwmdl");
 		path outputPath(outputDir / pwmdlFile);
-		WriteMaterialsToFile(outputPath, texturesDir, meshes);
-		WriteMeshesToFile(outputPath, meshes, importNormals);
+		WriteMaterialsToFile(outputPath, texturesDir, mesh.materials);
+		WriteMeshToFile(outputPath, mesh, importNormals);
 
 		// Print created file info to console
 		PrintCreatedFiles(outputPath, createdFiles, true);
@@ -173,7 +172,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		// Create files
 		path pwcolFile(inputFile.stem().string() + ".pwcol");
 		path outputPath(outputDir / pwcolFile);
-		WriteCollidersToFile(outputPath, meshes, importNormals);
+		WriteCollisionsToFile(outputPath, mesh, importNormals);
 
 		// Print created file info to console
 		PrintCreatedFiles(outputPath, vector<string>(0), false);
@@ -204,7 +203,7 @@ void PrintCreatedFiles(const path &outputFile, const vector<string> &createdFile
 	}
 }
 
-void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals)
+void WriteMeshToFile(const path &outputFile, const Mesh &mesh, bool importNormals)
 {
 	try
 	{
@@ -214,54 +213,53 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 		writer.Write(PWMDL_NAME);
 		writer.Write(PWMDL_VERSION);
 
-		// Meshes
-		int numMeshes = meshes.size();
-		writer.Write(numMeshes);
+		//writer.Write(mesh.name);
 
-		for (int i = 0; i < numMeshes; i++)
+		// Transform
+		//writer.Write(mesh.parentIndex);
+		//writer.Write(mesh.translation);
+		//writer.Write(mesh.rotation);
+		//writer.Write(mesh.scale);
+
+		// Vertices
+		int numVertices = mesh.vertices.size();
+		writer.Write(numVertices);
+		for (int j = 0; j < numVertices; j++)
+			writer.Write(mesh.vertices[j]);
+
+		// Normals
+		int numNormals = 0;
+		if (importNormals)
+			numNormals = mesh.normals.size();
+		writer.Write(numNormals);
+		for (int j = 0; j < numNormals; j++)
+			writer.Write(mesh.normals[j]);
+
+		// Uvs
+		int numUvs = mesh.uvs.size();
+		writer.Write(numUvs);
+		for (int j = 0; j < numUvs; j++)
+			writer.Write(mesh.uvs[j]);
+
+		// Sub mesh triangles
+		int subMeshCount = mesh.subMeshTriangles.size();
+		writer.Write(subMeshCount);
+		for (int j = 0; j < subMeshCount; j++)
 		{
-			Mesh mesh = meshes[i];
-
-			// Vertices
-			int numVertices = mesh.vertices.size();
-			writer.Write(numVertices);
-			for (int j = 0; j < numVertices; j++)
-				writer.Write(mesh.vertices[j]);
-
-			// Normals
-			int numNormals = 0;
-			if (importNormals)
-				numNormals = mesh.normals.size();
-			writer.Write(numNormals);
-			for (int j = 0; j < numNormals; j++)
-				writer.Write(mesh.normals[j]);
-
-			// Uvs
-			int numUvs = mesh.uvs.size();
-			writer.Write(numUvs);
-			for (int j = 0; j < numUvs; j++)
-				writer.Write(mesh.uvs[j]);
-
-			// Sub mesh triangles
-			int subMeshCount = mesh.subMeshTriangles.size();
-			writer.Write(subMeshCount);
-			for (int j = 0; j < subMeshCount; j++)
-			{
-				int numTriangles = mesh.subMeshTriangles[j].size();
-				writer.Write(numTriangles);
-				for (int k = 0; k < numTriangles; k++)
-					writer.Write(mesh.subMeshTriangles[j][k]);
-			}
-
-			// Print mesh info
-			cout << "Mesh " << i << ":" << endl;
-			cout << "Vertex Count: " << numVertices << endl;
-			cout << "Normal Count: " << numNormals << endl;
-			cout << "UV Count: " << numUvs << endl;
-			cout << "Triangle Count: " << mesh.triangles.size() << endl;
-			cout << "Material Count: " << mesh.materials.size() << endl;
-			cout << endl;
+			int numTriangles = mesh.subMeshTriangles[j].size();
+			writer.Write(numTriangles);
+			for (int k = 0; k < numTriangles; k++)
+				writer.Write(mesh.subMeshTriangles[j][k]);
 		}
+
+		// Print mesh info
+		cout << "Mesh Info:" << endl;
+		cout << "Vertex Count: " << numVertices << endl;
+		cout << "Normal Count: " << numNormals << endl;
+		cout << "UV Count: " << numUvs << endl;
+		cout << "Triangle Count: " << mesh.triangles.size() << endl;
+		cout << "Material Count: " << mesh.materials.size() << endl;
+		cout << endl;
 	}
 	catch (exception &e)
 	{
@@ -269,7 +267,7 @@ void WriteMeshesToFile(const path &outputFile, vector<Mesh> &meshes, bool import
 	}
 }
 
-void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool importNormals)
+void WriteCollisionsToFile(const path &outputFile, const Mesh &mesh, bool importNormals)
 {
 	try
 	{
@@ -279,41 +277,32 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 		writer.Write(PWCOL_NAME);
 		writer.Write(PWCOL_VERSION);
 
-		// Meshes
-		int numMeshes = meshes.size();
-		writer.Write(numMeshes);
+		// Vertices
+		int numVertices = mesh.vertices.size();
+		writer.Write(numVertices);
+		for (int j = 0; j < numVertices; j++)
+			writer.Write(mesh.vertices[j]);
 
-		for (int i = 0; i < numMeshes; i++)
-		{
-			Mesh mesh = meshes[i];
+		// Normals
+		int numNormals = 0;
+		if (importNormals)
+			numNormals = mesh.normals.size();
+		writer.Write(numNormals);
+		for (int j = 0; j < numNormals; j++)
+			writer.Write(mesh.normals[j]);
 
-			// Vertices
-			int numVertices = mesh.vertices.size();
-			writer.Write(numVertices);
-			for (int j = 0; j < numVertices; j++)
-				writer.Write(mesh.vertices[j]);
+		// Triangles
+		int numTriangles = mesh.triangles.size();
+		writer.Write(numTriangles);
+		for (int j = 0; j < numTriangles; j++)
+			writer.Write(mesh.triangles[j]);
 
-			// Normals
-			int numNormals = 0;
-			if (importNormals)
-				numNormals = mesh.normals.size();
-			writer.Write(numNormals);
-			for (int j = 0; j < numNormals; j++)
-				writer.Write(mesh.normals[j]);
-
-			// Triangles
-			int numTriangles = mesh.triangles.size();
-			writer.Write(numTriangles);
-			for (int j = 0; j < numTriangles; j++)
-				writer.Write(mesh.triangles[j]);
-
-			// Print mesh info
-			cout << "Mesh " << i + 1 << ":" << endl;
-			cout << "Vertex Count: " << numVertices << endl;
-			cout << "Normal Count: " << numNormals << endl;
-			cout << "Triangle Count: " << numTriangles << endl;
-			cout << endl;
-		}
+		// Print mesh info
+		cout << "Mesh Info:" << endl;
+		cout << "Vertex Count: " << numVertices << endl;
+		cout << "Normal Count: " << numNormals << endl;
+		cout << "Triangle Count: " << numTriangles << endl;
+		cout << endl;
 	}
 	catch (exception &e)
 	{
@@ -321,7 +310,7 @@ void WriteCollidersToFile(const path &outputFile, vector<Mesh> &meshes, bool imp
 	}
 }
 
-void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Mesh> &meshes)
+void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, const vector<Material> &materials)
 {
 	path pwmatFile(outputFile.stem().string() + ".pwmat");
 	path outputPath = outputFile.parent_path() / pwmatFile;
@@ -329,41 +318,33 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 	ofstream file;
 	file.open(outputPath.string());
 
-	for (unsigned int i = 0; i < meshes.size(); i++)
+	for (unsigned int i = 0; i < materials.size(); i++)
 	{
-		for (unsigned int j = 0; j < meshes[i].materials.size(); j++)
-		{
-			vector<Material> materials = meshes[i].materials;
-			file << "Material Standard" << endl;
-			file << "{" << endl;
-			WriteMaterial(file, materials[j], pwmdlFileName);
-			file << "}";
-			if (j != materials.size() - 1) // Create line spacing if this is not the last material
-				file << endl << endl;
-		}
+		file << "Standard" << endl;
+		file << "{" << endl;
+		WriteMaterial(file, materials[i], pwmdlFileName);
+		file << "}";
+		if (i != materials.size() - 1) // Create line spacing if this is not the last material
+			file << endl << endl;
 	}
 	file.close();
 }
 
-void CreateDDSFiles(const path &materialsDir, vector<Mesh> &meshes, vector<string> &createdFiles)
+void CreateDDSFiles(const path &materialsDir, const vector<Material> &materials, vector<string> &createdFiles)
 {
 	path texconvPath(initial_path() / "texconv.exe");
 	if (exists(texconvPath))
 	{
-		for (unsigned int i = 0; i < meshes.size(); i++)
+		for (unsigned int i = 0; i < materials.size(); i++)
 		{
-			vector<Material> materials = meshes[i].materials;
-			for (unsigned int j = 0; j < materials.size(); j++)
-			{
-				CreateDDSFile(materialsDir, materials[j].diffuseMap, createdFiles);
-				CreateDDSFile(materialsDir, materials[j].normalMap, createdFiles);
-				CreateDDSFile(materialsDir, materials[j].specularMap, createdFiles);
+			CreateDDSFile(materialsDir, materials[i].diffuseMap, createdFiles);
+			CreateDDSFile(materialsDir, materials[i].normalMap, createdFiles);
+			CreateDDSFile(materialsDir, materials[i].specularMap, createdFiles);
 
-				// Print material info
-				cout << "Material " << j << ":" << endl;
-				PrintMaterial(materials[j]);
-				cout << endl;
-			}
+			// Print material info
+			cout << "Material " << i << " Info:" << endl;
+			PrintMaterial(materials[i]);
+			cout << endl;
 		}
 	}
 	else
