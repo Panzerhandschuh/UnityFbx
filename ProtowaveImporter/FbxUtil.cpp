@@ -1,8 +1,6 @@
 #include "stdafx.h"
 #include "FbxUtil.h"
 
-using namespace fbxsdk_2015_1;
-
 FbxAMatrix FbxUtil::GetGlobalPosition(FbxNode* node, FbxPose* pose, FbxAMatrix* parentGlobalPosition)
 {
 	FbxAMatrix globalPosition;

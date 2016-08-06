@@ -14,12 +14,11 @@
 class MeshImporter
 {
 public:
-	MeshImporter(const path &inputFile);
+	MeshImporter(const boost::filesystem::path &inputFile);
 	~MeshImporter();
 	bool Import(Mesh &mesh, bool isCollider = false);
 
 private:
-	path fbxFile;
 	FbxScene *scene;
 	FbxManager *manager;
 	bool isCollider;
@@ -27,15 +26,15 @@ private:
 	//void ProcessNode(FbxNode *node, vector<Mesh> &meshes, int parentIndex);
 	Mesh ProcessMesh(FbxMesh *fbxMesh, FbxArray<FbxNode*> fbxMeshes);
 	void GetAllMeshes(FbxNode *node, FbxArray<FbxNode*> &fbxMeshes);
-	vector<Material> GetMaterials(FbxNode *node);
-	path GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName);
+	std::vector<Material> GetMaterials(FbxNode *node);
+	boost::filesystem::path GetTexturePath(FbxSurfaceMaterial *material, const char* propertyName);
 };
 
 struct VertexInfo
 {
 	FbxVector4 normal;
 	FbxVector2 uv;
-	vector<int> triangles;
+	std::vector<int> triangles;
 };
 
 FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix);

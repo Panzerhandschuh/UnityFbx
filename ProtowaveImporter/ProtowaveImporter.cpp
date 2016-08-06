@@ -14,7 +14,6 @@
 
 using namespace std;
 using namespace boost::filesystem;
-using namespace fbxsdk_2015_1;
 
 const char *PWMDL_NAME = "PWMDL";
 const char *PWCOL_NAME = "PWCOL";
@@ -29,12 +28,12 @@ void CreateDDSFiles(const path &materialsDir, const vector<Material> &materials,
 void CreateDDSFile(const path &materialsDir, const path &texturePath, vector<string> &createdFiles);
 ostream& operator<<(ostream& os, const FbxDouble2 &d2);
 ostream& operator<<(ostream& os, const FbxDouble3 &d3);
-ofstream& operator<<(ofstream& os, const FbxDouble2 &d2);
-ofstream& operator<<(ofstream& os, const FbxDouble3 &d3);
+std::ofstream& operator<<(std::ofstream& os, const FbxDouble2 &d2);
+std::ofstream& operator<<(std::ofstream& os, const FbxDouble3 &d3);
 void PrintColor(const FbxDouble3 &d3);
-void WriteColor(ofstream& os, const FbxDouble3 &d3);
+void WriteColor(std::ofstream& os, const FbxDouble3 &d3);
 void PrintMaterial(const Material &mat);
-void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName);
+void WriteMaterial(std::ofstream& os, const Material &mat, const string &pwmdlFileName);
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -315,7 +314,7 @@ void WriteMaterialsToFile(const path &outputFile, const path &materialsDir, cons
 	path pwmatFile(outputFile.stem().string() + ".pwmat");
 	path outputPath = outputFile.parent_path() / pwmatFile;
 	string pwmdlFileName = outputFile.stem().string();
-	ofstream file;
+	std::ofstream file;
 	file.open(outputPath.string());
 
 	for (unsigned int i = 0; i < materials.size(); i++)
@@ -401,13 +400,13 @@ ostream& operator<<(ostream& os, const FbxDouble3 &d3)
 	return os;
 }
 
-ofstream& operator<<(ofstream& os, const FbxDouble2 &d2)
+std::ofstream& operator<<(std::ofstream& os, const FbxDouble2 &d2)
 {
 	os << d2[0] << " " << d2[1];
 	return os;
 }
 
-ofstream& operator<<(ofstream& os, const FbxDouble3 &d3)
+std::ofstream& operator<<(std::ofstream& os, const FbxDouble3 &d3)
 {
 	os << d3[0] << " " << d3[1] << " " << d3[2];
 	return os;
@@ -418,7 +417,7 @@ void PrintColor(const FbxDouble3 &d3)
 	cout << "R:" << (int)(d3[0] * 255) << " G:" << (int)(d3[1] * 255) << " B:" << (int)(d3[2] * 255);
 }
 
-void WriteColor(ofstream& os, const FbxDouble3 &d3)
+void WriteColor(std::ofstream& os, const FbxDouble3 &d3)
 {
 	os << (int)(d3[0] * 255) << " " << (int)(d3[1] * 255) << " " << (int)(d3[2] * 255);
 }
@@ -451,7 +450,7 @@ void PrintMaterial(const Material &mat)
 		cout << "Offset: " << mat.uvTranslation << endl;
 }
 
-void WriteMaterial(ofstream& os, const Material &mat, const string &pwmdlFileName)
+void WriteMaterial(std::ofstream& os, const Material &mat, const string &pwmdlFileName)
 {
 	// Color/opacity info
 	os << "\t" << "Color ";

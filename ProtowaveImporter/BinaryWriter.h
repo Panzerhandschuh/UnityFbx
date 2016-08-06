@@ -18,7 +18,7 @@ public:
 	void Write(Vector3 vec);
 
 private:
-	ofstream file;
+	std::ofstream file;
 };
 
 #endif

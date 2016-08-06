@@ -3,13 +3,9 @@
 
 using namespace std;
 using namespace boost::filesystem;
-using namespace fbxsdk_2015_1;
 
 MeshImporter::MeshImporter(const path &inputFile)
 {
-	fbxFile = inputFile;
-	//materialsDir = materialsDirectory;
-
 	manager = FbxManager::Create();
 	FbxIOSettings *ioSettings = FbxIOSettings::Create(manager, IOSROOT);
 	FbxImporter *importer = FbxImporter::Create(manager, "");

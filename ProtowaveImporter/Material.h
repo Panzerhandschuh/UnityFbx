@@ -5,17 +5,14 @@
 #include <vector>
 #include <boost\filesystem\path.hpp>
 
-using namespace std;
-using namespace boost::filesystem;
-
 struct Material
 {
 	FbxDouble3 color;
 	bool hasOpacity;
 	FbxDouble opacity;
-	path diffuseMap;
-	path normalMap;
-	path specularMap;
+	boost::filesystem::path diffuseMap;
+	boost::filesystem::path normalMap;
+	boost::filesystem::path specularMap;
 	FbxDouble2 uvScaling;
 	FbxDouble2 uvTranslation;
 
