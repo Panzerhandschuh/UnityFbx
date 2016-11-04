@@ -369,30 +369,3 @@ path MeshImporter::GetTexturePath(FbxSurfaceMaterial *material, const char* prop
 
 	return "";
 }
-
-FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix)
-{
-	FbxVector4 result;
-	for (int i = 0; i < 4; i++)
-	{
-		for (int j = 0; j < 4; j++)
-		{
-			result[i] += matrix[j][i] * vector[j];
-		}
-	}
-	return result;
-}
-
-FbxVector4& operator*=(FbxVector4 &vector, const FbxAMatrix &matrix)
-{
-	FbxVector4 result;
-	for (int i = 0; i < 4; i++)
-	{
-		for (int j = 0; j < 4; j++)
-		{
-			result[i] += matrix[j][i] * vector[j];
-		}
-	}
-	vector = result;
-	return vector;
-}

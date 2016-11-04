@@ -37,7 +37,4 @@ struct VertexInfo
 	std::vector<int> triangles;
 };
 
-FbxVector4 operator*(const FbxVector4 &vector, const FbxAMatrix &matrix);
-FbxVector4& operator*=(FbxVector4 &vector, const FbxAMatrix &matrix);
-
 #endif

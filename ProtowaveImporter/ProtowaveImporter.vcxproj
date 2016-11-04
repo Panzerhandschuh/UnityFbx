@@ -87,26 +87,32 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FbxUtil.h" />
+    <ClInclude Include="MaterialUtil.h" />
     <ClInclude Include="MathUtil.h" />
     <ClInclude Include="ImageInfo.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="MeshImporter.h" />
     <ClInclude Include="BinaryWriter.h" />
+    <ClInclude Include="MeshUtil.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="TextureUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FbxUtil.cpp" />
+    <ClCompile Include="MaterialUtil.cpp" />
     <ClCompile Include="MathUtil.cpp" />
     <ClCompile Include="ImageInfo.cpp" />
     <ClCompile Include="MeshImporter.cpp" />
+    <ClCompile Include="MeshUtil.cpp" />
     <ClCompile Include="ProtowaveImporter.cpp" />
     <ClCompile Include="BinaryWriter.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="TextureUtil.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
